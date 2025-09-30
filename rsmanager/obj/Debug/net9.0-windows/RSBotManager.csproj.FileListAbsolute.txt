@@ -1,0 +1,14 @@
+C:\Users\PC\Desktop\rsmanager\bin\Debug\net9.0-windows\RSBotManager.exe
+C:\Users\PC\Desktop\rsmanager\bin\Debug\net9.0-windows\RSBotManager.deps.json
+C:\Users\PC\Desktop\rsmanager\bin\Debug\net9.0-windows\RSBotManager.runtimeconfig.json
+C:\Users\PC\Desktop\rsmanager\bin\Debug\net9.0-windows\RSBotManager.dll
+C:\Users\PC\Desktop\rsmanager\bin\Debug\net9.0-windows\RSBotManager.pdb
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.AssemblyInfoInputs.cache
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.AssemblyInfo.cs
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.csproj.CoreCompileInputs.cache
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.dll
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\refint\RSBotManager.dll
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.pdb
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\RSBotManager.genruntimeconfig.cache
+C:\Users\PC\Desktop\rsmanager\obj\Debug\net9.0-windows\ref\RSBotManager.dll
