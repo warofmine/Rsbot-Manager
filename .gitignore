@@ -1,0 +1,6 @@
+.vs
+bin
+obj
+*.bak
+profiles.json
+running_bots.json
