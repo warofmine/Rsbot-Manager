@@ -1,4 +1,4 @@
-﻿namespace RSBotManager;
+namespace RSBotManager;
 
 partial class Form1
 {
