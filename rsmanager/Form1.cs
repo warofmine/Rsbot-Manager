@@ -27,15 +27,17 @@ namespace RSBotManager
         private ToolStripStatusLabel statusLabel;
         private ToolStripStatusLabel botCountLabel;
         private System.Windows.Forms.Timer refreshTimer;
+        private int startDelay = 5; // Başlatma gecikmesi (saniye)
 
         public Form1()
         {
             InitializeComponent();
             InitializeUI();
+            SetupStatusBar();
             LoadSettings();
+            LoadProfiles();
             LoadRunningBots();
             RefreshBotList();
-            SetupStatusBar();
         }
 
         private void SetupStatusBar()
@@ -74,46 +76,11 @@ namespace RSBotManager
         {
             // Form settings
             this.Text = "RSBot Manager";
-            this.MinimumSize = new Size(800, 450);
-            this.BackColor = Color.FromArgb(245, 245, 250); // Daha açık ve modern bir arka plan
-            this.Font = new Font("Segoe UI", 9F); // Modern font
+            this.MinimumSize = new Size(1100, 600);
+            this.Size = new Size(1200, 700);
+            this.BackColor = Color.FromArgb(245, 245, 250);
+            this.Font = new Font("Segoe UI", 9F);
             this.FormClosing += Form1_FormClosing;
-            
-            // Status bar ekleme
-            var statusStrip = new StatusStrip
-            {
-                Dock = DockStyle.Bottom,
-                BackColor = Color.FromArgb(240, 240, 245),
-                SizingGrip = false
-            };
-            
-            var statusLabel = new ToolStripStatusLabel("RSBot Manager Hazır")
-            {
-                Spring = true,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            
-            var botCountLabel = new ToolStripStatusLabel("Çalışan Bot: 0")
-            {
-                Alignment = ToolStripItemAlignment.Right
-            };
-            
-            statusStrip.Items.Add(statusLabel);
-            statusStrip.Items.Add(botCountLabel);
-            this.Controls.Add(statusStrip);
-            
-            // Auto-refresh timer
-            var refreshTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 5000,
-                Enabled = true
-            };
-            
-            refreshTimer.Tick += (s, e) => {
-                int runningBots = bots.Count(b => b.Process != null && !b.Process.HasExited);
-                botCountLabel.Text = $"Çalışan Bot: {runningBots}";
-                RefreshBotList();
-            };
             
             // Create context menu for changing command format
             var contextMenuStrip = new ContextMenuStrip();
@@ -126,8 +93,128 @@ namespace RSBotManager
                     "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
 
-            // Ana panel (2 bölmeli: üst kontroller ve alt liste)
-            var mainPanel = new TableLayoutPanel
+            // Ana layout: Sol panel (profiller) + Sağ panel (üst ayarlar + alt bot listesi)
+            var mainSplitContainer = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 280,
+                FixedPanel = FixedPanel.Panel1,
+                IsSplitterFixed = false,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            this.Controls.Add(mainSplitContainer);
+
+            // === SOL PANEL: Profil Listesi ===
+            var leftPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(15),
+                BackColor = Color.FromArgb(250, 250, 252)
+            };
+            mainSplitContainer.Panel1.Controls.Add(leftPanel);
+
+            var lblProfiles = new Label
+            {
+                Text = "Profil Listesi",
+                Dock = DockStyle.Top,
+                Font = new Font(this.Font.FontFamily, 11F, FontStyle.Bold),
+                Height = 35,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(5, 8, 0, 0)
+            };
+
+            // Profil butonları paneli
+            var profileButtonsPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 120,
+                ColumnCount = 2,
+                RowCount = 3,
+                Padding = new Padding(0, 10, 0, 0)
+            };
+            profileButtonsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            profileButtonsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            profileButtonsPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+            profileButtonsPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+            profileButtonsPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+
+            // Profil listesi (ListBox)
+            lstProfiles = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 12F),
+                IntegralHeight = false,
+                ItemHeight = 28
+            };
+
+            // Kontrolleri doğru sırada ekle (ters sıra: önce bottom, sonra fill, en son top)
+            leftPanel.Controls.Add(profileButtonsPanel);
+            leftPanel.Controls.Add(lstProfiles);
+            leftPanel.Controls.Add(lblProfiles);
+
+            btnAddProfile = new Button
+            {
+                Text = "Ekle",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 3),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 10F, FontStyle.Bold)
+            };
+            btnAddProfile.FlatAppearance.BorderSize = 0;
+
+            btnRemoveProfile = new Button
+            {
+                Text = "Çıkar",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 3),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(220, 53, 69),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 10F, FontStyle.Bold)
+            };
+            btnRemoveProfile.FlatAppearance.BorderSize = 0;
+
+            btnMoveUp = new Button
+            {
+                Text = "⬆⬆",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 2, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 12F, FontStyle.Bold)
+            };
+            btnMoveUp.FlatAppearance.BorderSize = 0;
+
+            btnMoveDown = new Button
+            {
+                Text = "⬇⬇",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2, 0, 0, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 12F, FontStyle.Bold)
+            };
+            btnMoveDown.FlatAppearance.BorderSize = 0;
+
+            // Butonları panele ekle
+            profileButtonsPanel.Controls.Add(btnAddProfile, 0, 0);
+            profileButtonsPanel.SetColumnSpan(btnAddProfile, 2); // Ekle butonu 2 sütun genişliğinde
+            
+            profileButtonsPanel.Controls.Add(btnRemoveProfile, 0, 1);
+            profileButtonsPanel.SetColumnSpan(btnRemoveProfile, 2); // Çıkar butonu 2 sütun genişliğinde
+            
+            profileButtonsPanel.Controls.Add(btnMoveUp, 0, 2);
+            profileButtonsPanel.Controls.Add(btnMoveDown, 1, 2);
+
+            // === SAĞ PANEL: Üst ayarlar + Alt bot listesi ===
+            var rightPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
@@ -135,208 +222,193 @@ namespace RSBotManager
                 Padding = new Padding(10),
                 BackColor = Color.Transparent
             };
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150)); // Üst panel için sabit yükseklik
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // Alt panel için kalan alan
-            this.Controls.Add(mainPanel);
+            rightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 170));
+            rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            mainSplitContainer.Panel2.Controls.Add(rightPanel);
 
-            // Üst panel (ayarlar ve butonlar için)
+            // Üst panel (RSBot yolu ve kontroller)
             var topPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 3,
                 RowCount = 4,
-                Margin = new Padding(0, 0, 0, 10),
-                BackColor = Color.Transparent,
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+                BackColor = Color.Transparent
             };
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130)); // Etiketler için genişlik
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));  // Giriş alanları için genişlik
-            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120)); // Butonlar için genişlik
-            
-            // Satır yükseklikleri
-            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); 
-            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); // Son satır biraz daha yüksek
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
+            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));
+            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+            topPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
 
-            // Etiketler
-            var lblRSBotPath = new Label { 
-                Text = "RSBot Yolu:", 
-                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            var lblRSBotPath = new Label
+            {
+                Text = "RSBot Yolu:",
+                Anchor = AnchorStyles.Left,
                 TextAlign = ContentAlignment.MiddleLeft,
-                AutoSize = true,
-                Padding = new Padding(5, 0, 0, 0),
-                Font = new Font(this.Font, FontStyle.Regular)
+                AutoSize = true
             };
-            var lblProfileName = new Label { 
-                Text = "Profil Adı:", 
-                Anchor = AnchorStyles.Left | AnchorStyles.Right,
-                TextAlign = ContentAlignment.MiddleLeft,
-                AutoSize = true,
-                Padding = new Padding(5, 0, 0, 0),
-                Font = new Font(this.Font, FontStyle.Regular)
-            };
-            var lblSavedProfiles = new Label { 
-                Text = "Kayıtlı Profiller:", 
-                Anchor = AnchorStyles.Left | AnchorStyles.Right,
-                TextAlign = ContentAlignment.MiddleLeft,
-                AutoSize = true,
-                Padding = new Padding(5, 0, 0, 0),
-                Font = new Font(this.Font, FontStyle.Regular)
-            };
-            
-            // Metin kutuları ve ComboBox
-            txtRSBotPath = new TextBox { 
-                Dock = DockStyle.Fill,
-                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
-                Margin = new Padding(0, 5, 5, 0),
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.White
-            };
-            txtRSBotPath.ContextMenuStrip = contextMenuStrip;
-            
-            txtProfileName = new TextBox { 
-                Dock = DockStyle.Fill,
-                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
-                Margin = new Padding(0, 5, 5, 0),
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.White
-            };
-            
-            cmbSavedProfiles = new ComboBox { 
-                Dock = DockStyle.Fill, 
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Margin = new Padding(0, 5, 5, 0),
-                FlatStyle = FlatStyle.Popup,
-                BackColor = Color.White
-            };
-            cmbSavedProfiles.SelectedIndexChanged += CmbSavedProfiles_SelectedIndexChanged;
-            
-            // Butonlar
-            btnBrowse = new Button { 
-                Text = "Gözat", 
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 4, 0, 0),
-                FlatStyle = FlatStyle.System,
-                UseVisualStyleBackColor = true
-            };
-            
-            btnStart = new Button { 
-                Text = "Başlat", 
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 4, 0, 0),
-                FlatStyle = FlatStyle.System,
-                UseVisualStyleBackColor = true,
-                Font = new Font(this.Font, FontStyle.Bold)
-            };
-            
-            // Profil yönetim butonları paneli
-            var profileButtonPanel = new TableLayoutPanel
+
+            // RSBot yolu için panel (TextBox + Gözat butonu)
+            var rsbotPathPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 1,
-                Margin = new Padding(5, 4, 0, 0),
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+                Margin = new Padding(0)
             };
-            profileButtonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            profileButtonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            
-            btnAddProfile = new Button { 
-                Text = "Ekle", 
-                Dock = DockStyle.Fill,
-                Margin = new Padding(0, 0, 2, 0),
-                FlatStyle = FlatStyle.System,
-                UseVisualStyleBackColor = true
-            };
-            
-            btnRemoveProfile = new Button { 
-                Text = "Sil", 
-                Dock = DockStyle.Fill,
-                Margin = new Padding(2, 0, 0, 0),
-                FlatStyle = FlatStyle.System,
-                UseVisualStyleBackColor = true
-            };
-            
-            profileButtonPanel.Controls.Add(btnAddProfile, 0, 0);
-            profileButtonPanel.Controls.Add(btnRemoveProfile, 1, 0);
-            
-            // Alt buton paneli (Durdur, Yenile, Gizle/Göster)
-            var buttonPanel = new TableLayoutPanel
+            rsbotPathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            rsbotPathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+
+            txtRSBotPath = new TextBox
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 3,
-                RowCount = 1,
-                Margin = new Padding(0),
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+                Margin = new Padding(0, 5, 3, 0),
+                BorderStyle = BorderStyle.FixedSingle,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right
             };
-            buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3F));
-            buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3F));
-            buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.4F));
-              btnStop = new Button { 
-                Text = "Durdur", 
-                Dock = DockStyle.Fill, 
-                Margin = new Padding(0, 0, 2, 0),
-                FlatStyle = FlatStyle.Flat,
-                UseVisualStyleBackColor = false,
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(220, 53, 69),
-                Font = new Font(this.Font.FontFamily, this.Font.Size, FontStyle.Bold),
-                Padding = new Padding(10, 3, 10, 3),
-                Image = SystemIcons.Error.ToBitmap(),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText
+            txtRSBotPath.ContextMenuStrip = contextMenuStrip;
+
+            btnBrowse = new Button
+            {
+                Text = "Gözat",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(3, 4, 0, 0),
+                FlatStyle = FlatStyle.System
             };
-            
-            btnRefresh = new Button { 
-                Text = "Yenile", 
-                Dock = DockStyle.Fill, 
-                Margin = new Padding(2, 0, 2, 0),
-                FlatStyle = FlatStyle.Flat,
-                UseVisualStyleBackColor = false,
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(13, 110, 253),
-                Font = new Font(this.Font.FontFamily, this.Font.Size, FontStyle.Regular),
-                Padding = new Padding(10, 3, 10, 3),
-                Image = SystemIcons.Information.ToBitmap(),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText
+
+            rsbotPathPanel.Controls.Add(txtRSBotPath, 0, 0);
+            rsbotPathPanel.Controls.Add(btnBrowse, 1, 0);
+
+            var lblDelay = new Label
+            {
+                Text = "Başlatma Aralığı:",
+                Anchor = AnchorStyles.Left,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = true
             };
-            
-            btnHideShow = new Button { 
-                Text = "Gizle/Göster", 
-                Dock = DockStyle.Fill, 
-                Margin = new Padding(2, 0, 0, 0),
+
+            txtDelay = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 5, 5, 0),
+                BorderStyle = BorderStyle.FixedSingle,
+                Text = "5"
+            };
+
+            var lblDelayUnit = new Label
+            {
+                Text = "saniye",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(5, 5, 0, 0),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            // Satır 1 butonları: Seçili Profili Başlat, Durdur, Gizle/Göster
+            btnStartSelected = new Button
+            {
+                Text = "▶ Seçili Profili Başlat",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 5, 3, 3),
                 FlatStyle = FlatStyle.Flat,
-                UseVisualStyleBackColor = false,
-                ForeColor = Color.White,
                 BackColor = Color.FromArgb(40, 167, 69),
-                Font = new Font(this.Font.FontFamily, this.Font.Size, FontStyle.Regular),
-                Padding = new Padding(10, 3, 10, 3),
-                Image = SystemIcons.Shield.ToBitmap(),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
             };
-            
-            buttonPanel.Controls.Add(btnStop, 0, 0);
-            buttonPanel.Controls.Add(btnRefresh, 1, 0);
-            buttonPanel.Controls.Add(btnHideShow, 2, 0);
-            
-            // Kontrolleri panellere ekleme
+            btnStartSelected.FlatAppearance.BorderSize = 0;
+
+            btnStop = new Button
+            {
+                Text = "⏹ Durdur",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(3, 5, 3, 3),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(220, 53, 69),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnStop.FlatAppearance.BorderSize = 0;
+
+            btnHideShow = new Button
+            {
+                Text = "👁 Gizle/Göster",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(3, 5, 0, 3),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(13, 110, 253),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnHideShow.FlatAppearance.BorderSize = 0;
+
+            // Satır 2 butonları: Tümünü Başlat, Tümünü Durdur, Tümünü Gizle/Göster
+            btnStartAll = new Button
+            {
+                Text = "▶ Tümünü Başlat",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 3, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnStartAll.FlatAppearance.BorderSize = 0;
+
+            btnStopAll = new Button
+            {
+                Text = "⏹ Tümünü Durdur",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(3, 3, 3, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(220, 53, 69),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnStopAll.FlatAppearance.BorderSize = 0;
+
+            btnToggleAllVisibility = new Button
+            {
+                Text = "👁 Tümünü Gizle",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(3, 3, 0, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(13, 110, 253),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 9F, FontStyle.Bold),
+                Padding = new Padding(5),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnToggleAllVisibility.FlatAppearance.BorderSize = 0;
+
             topPanel.Controls.Add(lblRSBotPath, 0, 0);
-            topPanel.Controls.Add(txtRSBotPath, 1, 0);
-            topPanel.Controls.Add(btnBrowse, 2, 0);
-            topPanel.Controls.Add(lblProfileName, 0, 1);
-            topPanel.Controls.Add(txtProfileName, 1, 1);
-            topPanel.Controls.Add(btnStart, 2, 1);
-            topPanel.Controls.Add(lblSavedProfiles, 0, 2);
-            topPanel.Controls.Add(cmbSavedProfiles, 1, 2);
-            topPanel.Controls.Add(profileButtonPanel, 2, 2);
-            topPanel.Controls.Add(buttonPanel, 1, 3);
+            topPanel.Controls.Add(rsbotPathPanel, 1, 0);
+            topPanel.SetColumnSpan(rsbotPathPanel, 2);
             
+            topPanel.Controls.Add(lblDelay, 0, 1);
+            topPanel.Controls.Add(txtDelay, 1, 1);
+            topPanel.Controls.Add(lblDelayUnit, 2, 1);
+            
+            // Satır 2: Seçili Profili Başlat, Durdur, Gizle/Göster
+            topPanel.Controls.Add(btnStartSelected, 0, 2);
+            topPanel.Controls.Add(btnStop, 1, 2);
+            topPanel.Controls.Add(btnHideShow, 2, 2);
+            
+            // Satır 3: Tümünü Başlat, Tümünü Durdur, Tümünü Gizle/Göster
+            topPanel.Controls.Add(btnStartAll, 0, 3);
+            topPanel.Controls.Add(btnStopAll, 1, 3);
+            topPanel.Controls.Add(btnToggleAllVisibility, 2, 3);
+
             // Bot listesi
             lvwBots = new ListView
             {
@@ -349,88 +421,193 @@ namespace RSBotManager
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White
             };
-            
-            lvwBots.Columns.Add("Profil Adı", 220);  // Daha geniş
+
+            lvwBots.Columns.Add("Profil Adı", 200);
             lvwBots.Columns.Add("PID", 80);
-            lvwBots.Columns.Add("Durum", 120);      // Daha geniş
-            lvwBots.Columns.Add("Görüntü", 120);    // Daha geniş
-            
-            // Ana panele ekleme
-            mainPanel.Controls.Add(topPanel, 0, 0);
-            mainPanel.Controls.Add(lvwBots, 0, 1);
-            
-            // Olayları kaydet
+            lvwBots.Columns.Add("Durum", 120);
+            lvwBots.Columns.Add("Görüntü", 100);
+
+            rightPanel.Controls.Add(topPanel, 0, 0);
+            rightPanel.Controls.Add(lvwBots, 0, 1);
+
+            // Event handlers
             btnBrowse.Click += btnBrowse_Click;
-            btnStart.Click += btnStart_Click;
+            btnStartAll.Click += BtnStartAll_Click;
             btnStop.Click += btnStop_Click;
-            btnRefresh.Click += btnRefresh_Click;
             btnHideShow.Click += btnHideShow_Click;
             lvwBots.SelectedIndexChanged += lvwBots_SelectedIndexChanged;
             btnAddProfile.Click += BtnAddProfile_Click;
             btnRemoveProfile.Click += BtnRemoveProfile_Click;
-            
+            btnMoveUp.Click += BtnMoveUp_Click;
+            btnMoveDown.Click += BtnMoveDown_Click;
+            lstProfiles.SelectedIndexChanged += LstProfiles_SelectedIndexChanged;
+            btnStartSelected.Click += BtnStartSelected_Click;
+            btnStopAll.Click += BtnStopAll_Click;
+            btnToggleAllVisibility.Click += BtnToggleAllVisibility_Click;
+
             // Başlangıçta butonları devre dışı bırak
             btnStop.Enabled = false;
-            btnHideShow.Enabled = false;
-            btnRemoveProfile.Enabled = false;
+            btnStop.BackColor = Color.FromArgb(150, 150, 150);
             
-            // Kayıtlı profilleri yükle
-            LoadProfiles();
+            btnHideShow.Enabled = false;
+            btnHideShow.BackColor = Color.FromArgb(150, 150, 150);
+            
+            btnRemoveProfile.Enabled = false;
+            btnMoveUp.Enabled = false;
+            btnMoveDown.Enabled = false;
+            btnStartAll.Enabled = false;
+            btnStartSelected.Enabled = false;
+            btnStopAll.Enabled = false;
+            btnToggleAllVisibility.Enabled = false;
         }
 
-        private void CmbSavedProfiles_SelectedIndexChanged(object sender, EventArgs e)
+        private void LstProfiles_SelectedIndexChanged(object sender, EventArgs e)
         {
-            btnRemoveProfile.Enabled = cmbSavedProfiles.SelectedIndex >= 0;
+            bool hasSelection = lstProfiles.SelectedIndex >= 0;
+            btnRemoveProfile.Enabled = hasSelection;
+            btnMoveUp.Enabled = hasSelection && lstProfiles.SelectedIndex > 0;
+            btnMoveDown.Enabled = hasSelection && lstProfiles.SelectedIndex < lstProfiles.Items.Count - 1;
+            btnStartSelected.Enabled = hasSelection && !string.IsNullOrWhiteSpace(txtRSBotPath.Text);
+        }
+
+        private void BtnMoveUp_Click(object sender, EventArgs e)
+        {
+            if (lstProfiles.SelectedIndex <= 0) return;
             
-            if (cmbSavedProfiles.SelectedIndex >= 0)
+            int index = lstProfiles.SelectedIndex;
+            string item = savedProfiles[index];
+            
+            savedProfiles.RemoveAt(index);
+            savedProfiles.Insert(index - 1, item);
+            
+            RefreshProfileList();
+            lstProfiles.SelectedIndex = index - 1;
+            SaveProfiles();
+        }
+
+        private void BtnMoveDown_Click(object sender, EventArgs e)
+        {
+            if (lstProfiles.SelectedIndex < 0 || lstProfiles.SelectedIndex >= lstProfiles.Items.Count - 1) return;
+            
+            int index = lstProfiles.SelectedIndex;
+            string item = savedProfiles[index];
+            
+            savedProfiles.RemoveAt(index);
+            savedProfiles.Insert(index + 1, item);
+            
+            RefreshProfileList();
+            lstProfiles.SelectedIndex = index + 1;
+            SaveProfiles();
+        }
+
+        private void RefreshProfileList()
+        {
+            lstProfiles.Items.Clear();
+            foreach (var profile in savedProfiles)
             {
-                txtProfileName.Text = cmbSavedProfiles.SelectedItem.ToString();
+                lstProfiles.Items.Add(profile);
             }
+            
+            btnStartAll.Enabled = savedProfiles.Count > 0 && !string.IsNullOrWhiteSpace(txtRSBotPath.Text);
         }
         
         private void BtnAddProfile_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtProfileName.Text))
+            // Profil adı girmek için dialog oluştur
+            using (var inputForm = new Form())
             {
-                MessageBox.Show("Lütfen bir profil adı girin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                inputForm.Text = "Yeni Profil Ekle";
+                inputForm.Size = new Size(400, 150);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+
+                var lblPrompt = new Label
+                {
+                    Text = "Profil Adı:",
+                    Location = new Point(20, 20),
+                    Size = new Size(350, 20)
+                };
+
+                var txtInput = new TextBox
+                {
+                    Location = new Point(20, 45),
+                    Size = new Size(340, 25)
+                };
+
+                var btnOK = new Button
+                {
+                    Text = "Kaydet",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 80),
+                    Size = new Size(80, 30)
+                };
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(290, 80),
+                    Size = new Size(70, 30)
+                };
+
+                inputForm.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOK, btnCancel });
+                inputForm.AcceptButton = btnOK;
+                inputForm.CancelButton = btnCancel;
+
+                if (inputForm.ShowDialog() == DialogResult.OK)
+                {
+                    string profileName = txtInput.Text.Trim();
+                    
+                    if (string.IsNullOrWhiteSpace(profileName))
+                    {
+                        MessageBox.Show("Lütfen bir profil adı girin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
+                    // Aynı isimde profil varsa uyar
+                    if (savedProfiles.Contains(profileName))
+                    {
+                        MessageBox.Show($"'{profileName}' isimli profil zaten kayıtlı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
+                    // Profili kaydet
+                    savedProfiles.Add(profileName);
+                    RefreshProfileList();
+                    SaveProfiles();
+                    
+                    // Yeni eklenen profili seç
+                    lstProfiles.SelectedIndex = lstProfiles.Items.Count - 1;
+                    
+                    MessageBox.Show($"'{profileName}' profili kaydedildi.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
-            
-            string profileName = txtProfileName.Text.Trim();
-            
-            // Aynı isimde profil varsa uyar
-            if (savedProfiles.Contains(profileName))
-            {
-                MessageBox.Show($"'{profileName}' isimli profil zaten kayıtlı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            
-            // Profili kaydet
-            savedProfiles.Add(profileName);
-            cmbSavedProfiles.Items.Add(profileName);
-            cmbSavedProfiles.SelectedItem = profileName;
-            SaveProfiles();
-            
-            MessageBox.Show($"'{profileName}' profili kaydedildi.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         
         private void BtnRemoveProfile_Click(object sender, EventArgs e)
         {
-            if (cmbSavedProfiles.SelectedIndex < 0) return;
+            if (lstProfiles.SelectedIndex < 0) return;
             
-            string profileName = cmbSavedProfiles.SelectedItem.ToString();
+            string profileName = lstProfiles.SelectedItem.ToString();
             
             if (MessageBox.Show($"'{profileName}' profilini silmek istediğinizden emin misiniz?", "Profil Silme", 
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
+                int selectedIndex = lstProfiles.SelectedIndex;
                 savedProfiles.Remove(profileName);
-                cmbSavedProfiles.Items.Remove(profileName);
+                RefreshProfileList();
                 SaveProfiles();
                 
-                if (cmbSavedProfiles.Items.Count > 0)
-                    cmbSavedProfiles.SelectedIndex = 0;
-                else
-                    btnRemoveProfile.Enabled = false;
+                // Silindikten sonra bir sonraki öğeyi seç
+                if (lstProfiles.Items.Count > 0)
+                {
+                    if (selectedIndex >= lstProfiles.Items.Count)
+                        lstProfiles.SelectedIndex = lstProfiles.Items.Count - 1;
+                    else
+                        lstProfiles.SelectedIndex = selectedIndex;
+                }
             }
         }
         
@@ -446,15 +623,7 @@ namespace RSBotManager
                     if (profiles != null)
                     {
                         savedProfiles = profiles;
-                        cmbSavedProfiles.Items.Clear();
-                        
-                        foreach (var profile in savedProfiles)
-                        {
-                            cmbSavedProfiles.Items.Add(profile);
-                        }
-                        
-                        if (cmbSavedProfiles.Items.Count > 0)
-                            cmbSavedProfiles.SelectedIndex = 0;
+                        RefreshProfileList();
                     }
                 }
             }
@@ -495,72 +664,106 @@ namespace RSBotManager
                     txtRSBotPath.Text = dialog.FileName;
                     rsbotPath = dialog.FileName;
                     SaveSettings();
+                    RefreshProfileList(); // Buton durumunu güncelle
                 }
             }
         }
 
-        private void btnStart_Click(object sender, EventArgs e)
+        private async void BtnStartAll_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtRSBotPath.Text))
             {
                 MessageBox.Show("Lütfen önce RSBot yolunu seçin.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                txtRSBotPath.Focus();
-                txtRSBotPath.BackColor = Color.FromArgb(255, 230, 230); // Highlight error
                 return;
-            }
-            else
-            {
-                txtRSBotPath.BackColor = SystemColors.Window;
             }
 
-            if (string.IsNullOrWhiteSpace(txtProfileName.Text))
+            if (savedProfiles.Count == 0)
             {
-                MessageBox.Show("Lütfen bir profil adı girin.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                txtProfileName.Focus();
-                txtProfileName.BackColor = Color.FromArgb(255, 230, 230); // Highlight error
+                MessageBox.Show("Başlatılacak profil bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
-            }
-            else
-            {
-                txtProfileName.BackColor = SystemColors.Window;
             }
 
-            string profileName = txtProfileName.Text.Trim();
-            
-            // Check if a bot with this name is already running
-            var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
-            if (existingBot != null)
+            // Delay değerini al
+            if (!int.TryParse(txtDelay.Text, out int delay) || delay < 0)
             {
-                MessageBox.Show($"'{profileName}' adlı bot zaten çalışıyor.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                
-                // Select the existing bot in the list
-                for (int i = 0; i < lvwBots.Items.Count; i++)
-                {
-                    if (lvwBots.Items[i].Text == profileName)
-                    {
-                        lvwBots.Items[i].Selected = true;
-                        lvwBots.EnsureVisible(i);
-                        break;
-                    }
-                }
-                
+                MessageBox.Show("Lütfen geçerli bir başlatma aralığı girin (0 veya daha büyük).", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                txtDelay.Focus();
                 return;
             }
-            
+
+            startDelay = delay;
+
+            // Butonları devre dışı bırak
+            btnStartAll.Enabled = false;
+            btnAddProfile.Enabled = false;
+            btnRemoveProfile.Enabled = false;
+            btnMoveUp.Enabled = false;
+            btnMoveDown.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+
             try
             {
-                // Show wait cursor
-                this.Cursor = Cursors.WaitCursor;
-                btnStart.Enabled = false;
-                
-                // Use the saved command format or ask user
+                statusLabel.Text = "Botlar başlatılıyor...";
+
+                for (int i = 0; i < savedProfiles.Count; i++)
+                {
+                    string profileName = savedProfiles[i];
+                    
+                    // Zaten çalışıyor mu kontrol et
+                    var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
+                    if (existingBot != null)
+                    {
+                        statusLabel.Text = $"'{profileName}' zaten çalışıyor, atlanıyor...";
+                        await Task.Delay(1000);
+                        continue;
+                    }
+
+                    statusLabel.Text = $"Başlatılıyor: {profileName} ({i + 1}/{savedProfiles.Count})";
+                    
+                    // Botu başlat
+                    await StartBot(profileName);
+
+                    // Son bot değilse delay uygula
+                    if (i < savedProfiles.Count - 1 && startDelay > 0)
+                    {
+                        for (int countdown = startDelay; countdown > 0; countdown--)
+                        {
+                            statusLabel.Text = $"Sonraki bot {countdown} saniye içinde başlatılacak...";
+                            await Task.Delay(1000);
+                        }
+                    }
+                }
+
+                statusLabel.Text = "Tüm botlar başlatıldı!";
+                await Task.Delay(2000);
+                statusLabel.Text = "RSBot Manager Hazır";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Botlar başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                statusLabel.Text = "Hata oluştu!";
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+                btnStartAll.Enabled = true;
+                btnAddProfile.Enabled = true;
+                RefreshBotList();
+            }
+        }
+
+        private async Task StartBot(string profileName)
+        {
+            try
+            {
+                // Komut formatını belirle
                 string arguments = string.Empty;
                 
                 if (commandFormat == null || commandFormat == "ask")
                 {
-                    // Display a selection dialog for command format
+                    // İlk kez sorulacak
                     DialogResult result = MessageBox.Show(
-                        $"Profil adı \"{profileName}\" için hangi komut formatını kullanmak istersiniz?\n\n" +
+                        $"Profil adı için hangi komut formatını kullanmak istersiniz?\n\n" +
                         "Evet = Doğrudan profil adını kullan (\"profil\")\n" + 
                         "Hayır = --name parametresini kullan (--name \"profil\")\n" +
                         "İptal = --profile parametresini kullan (--profile \"profil\")", 
@@ -570,32 +773,29 @@ namespace RSBotManager
                     
                     if (result == DialogResult.Yes)
                     {
-                        arguments = $"\"{profileName}\""; // Just the profile name
+                        arguments = $"\"{profileName}\"";
                         commandFormat = "direct";
                     }
                     else if (result == DialogResult.No)
                     {
-                        arguments = $"--name \"{profileName}\""; // --name parameter
+                        arguments = $"--name \"{profileName}\"";
                         commandFormat = "name";
                     }
                     else if (result == DialogResult.Cancel)
                     {
-                        arguments = $"--profile \"{profileName}\""; // --profile parameter
+                        arguments = $"--profile \"{profileName}\"";
                         commandFormat = "profile";
                     }
                     else
                     {
-                        this.Cursor = Cursors.Default;
-                        btnStart.Enabled = true;
-                        return; // User closed the dialog
+                        return; // Kullanıcı dialogu kapattı
                     }
-                        
-                    // Save the chosen format
+                    
                     SaveSettings();
                 }
                 else
                 {
-                    // Use the saved format
+                    // Kaydedilmiş formatı kullan
                     if (commandFormat == "direct")
                         arguments = $"\"{profileName}\"";
                     else if (commandFormat == "name")
@@ -624,43 +824,23 @@ namespace RSBotManager
                     
                     bots.Add(bot);
                     
-                    // Try to find window handle after a short delay
-                    Task.Run(async () =>
+                    // Pencere handle'ını bulmak için kısa bir bekleme
+                    await Task.Delay(3000);
+                    if (!process.HasExited)
                     {
-                        await Task.Delay(3000); // Wait for RSBot to initialize
-                        if (!process.HasExited)
-                        {
-                            process.Refresh();
-                            bot.WindowHandle = process.MainWindowHandle;
-                            this.Invoke(new Action(() => { RefreshBotList(); }));
-                        }
-                    });
+                        process.Refresh();
+                        bot.WindowHandle = process.MainWindowHandle;
+                    }
                     
                     RefreshBotList();
-                    txtProfileName.Clear();
-                    
-                    // If this is a new profile, ask if user wants to save it
-                    if (!savedProfiles.Contains(profileName) && 
-                        MessageBox.Show($"'{profileName}' profilini kaydetmek ister misiniz?", 
-                                       "Profili Kaydet", MessageBoxButtons.YesNo, 
-                                       MessageBoxIcon.Question) == DialogResult.Yes)
-                    {
-                        savedProfiles.Add(profileName);
-                        cmbSavedProfiles.Items.Add(profileName);
-                        SaveProfiles();
-                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Bot başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                this.Cursor = Cursors.Default;
-                btnStart.Enabled = true;
+                MessageBox.Show($"'{profileName}' başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         private void btnStop_Click(object sender, EventArgs e)
         {
@@ -685,10 +865,6 @@ namespace RSBotManager
             }
         }
 
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
-            RefreshBotList();
-        }
 
         private void lvwBots_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -697,8 +873,26 @@ namespace RSBotManager
           private void UpdateButtonStates()
         {
             bool hasSelection = lvwBots.SelectedItems.Count > 0;
+            bool hasBots = bots.Count > 0;
+            
             btnStop.Enabled = hasSelection;
             btnHideShow.Enabled = hasSelection;
+            
+            // Yeni butonların durumları
+            btnStopAll.Enabled = hasBots;
+            btnToggleAllVisibility.Enabled = hasBots;
+            
+            // Buton renklerini duruma göre ayarla
+            if (!hasSelection)
+            {
+                btnStop.BackColor = Color.FromArgb(150, 150, 150);
+                btnHideShow.BackColor = Color.FromArgb(150, 150, 150);
+            }
+            else
+            {
+                btnStop.BackColor = Color.FromArgb(220, 53, 69);
+                // btnHideShow rengi UpdateHideShowButtonText'te ayarlanacak
+            }
             
             // Update the hide/show button text based on the selection
             UpdateHideShowButtonText();
@@ -708,10 +902,9 @@ namespace RSBotManager
         {
             if (lvwBots.SelectedItems.Count == 0)
             {
-                btnHideShow.Text = "Gizle/Göster";
+                btnHideShow.Text = "👁 Gizle/Göster";
                 btnHideShow.BackColor = Color.FromArgb(108, 117, 125); // Gray for inactive
                 btnHideShow.ForeColor = Color.White;
-                btnHideShow.Image = SystemIcons.Shield.ToBitmap();
                 return;
             }
             
@@ -722,25 +915,22 @@ namespace RSBotManager
             {
                 if (botInstance.IsHidden)
                 {
-                    btnHideShow.Text = "Göster";
+                    btnHideShow.Text = "👁 Göster";
                     btnHideShow.BackColor = Color.FromArgb(0, 123, 255); // Blue for Show
                     btnHideShow.ForeColor = Color.White;
-                    btnHideShow.Image = SystemIcons.Application.ToBitmap();
                 }
                 else
                 {
-                    btnHideShow.Text = "Gizle";
+                    btnHideShow.Text = "👁 Gizle";
                     btnHideShow.BackColor = Color.FromArgb(40, 167, 69); // Green for Hide
                     btnHideShow.ForeColor = Color.White;
-                    btnHideShow.Image = SystemIcons.Shield.ToBitmap();
                 }
             }
             else
             {
-                btnHideShow.Text = "Gizle/Göster";
+                btnHideShow.Text = "👁 Gizle/Göster";
                 btnHideShow.BackColor = Color.FromArgb(108, 117, 125); // Gray for inactive
                 btnHideShow.ForeColor = Color.White;
-                btnHideShow.Image = SystemIcons.Shield.ToBitmap();
             }
         }
 
@@ -885,6 +1075,12 @@ namespace RSBotManager
                         {
                             commandFormat = format;
                         }
+                        
+                        if (settings.TryGetValue("StartDelay", out string delayStr) && int.TryParse(delayStr, out int delay))
+                        {
+                            startDelay = delay;
+                            txtDelay.Text = delay.ToString();
+                        }
                     }
                 }
             }
@@ -901,7 +1097,8 @@ namespace RSBotManager
                 var settings = new Dictionary<string, string>
                 {
                     { "RSBotPath", txtRSBotPath.Text },
-                    { "CommandFormat", commandFormat }
+                    { "CommandFormat", commandFormat },
+                    { "StartDelay", startDelay.ToString() }
                 };
                 
                 string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
@@ -988,7 +1185,197 @@ namespace RSBotManager
             }
         }
 
-        private void btnHideShow_Click(object sender, EventArgs e)
+        private async void BtnStartSelected_Click(object sender, EventArgs e)
+        {
+            if (lstProfiles.SelectedIndex < 0) return;
+            
+            string profileName = lstProfiles.SelectedItem.ToString();
+            
+            // Zaten çalışıyor mu kontrol et
+            var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
+            if (existingBot != null)
+            {
+                MessageBox.Show($"'{profileName}' zaten çalışıyor.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            
+            btnStartSelected.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+            
+            try
+            {
+                statusLabel.Text = $"Başlatılıyor: {profileName}";
+                await StartBot(profileName);
+                statusLabel.Text = "RSBot Manager Hazır";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Bot başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+                btnStartSelected.Enabled = lstProfiles.SelectedIndex >= 0;
+            }
+        }
+
+        private void BtnStopAll_Click(object sender, EventArgs e)
+        {
+            if (bots.Count == 0)
+            {
+                MessageBox.Show("Çalışan bot bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            
+            if (MessageBox.Show($"{bots.Count} adet çalışan botu durdurmak istediğinizden emin misiniz?", 
+                "Tümünü Durdur", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            {
+                return;
+            }
+            
+            int stoppedCount = 0;
+            foreach (var bot in bots.ToList())
+            {
+                if (bot.Process != null && !bot.Process.HasExited)
+                {
+                    try
+                    {
+                        bot.Process.Kill();
+                        bot.Process.WaitForExit(1000);
+                        stoppedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"'{bot.Name}' durdurulurken hata: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            
+            RefreshBotList();
+            SaveRunningBots();
+            MessageBox.Show($"{stoppedCount} bot durduruldu.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private async void BtnToggleAllVisibility_Click(object sender, EventArgs e)
+        {
+            if (bots.Count == 0)
+            {
+                MessageBox.Show("Çalışan bot bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            
+            btnToggleAllVisibility.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+            
+            try
+            {
+                // Tüm botların durumunu kontrol et
+                int visibleCount = bots.Count(b => b.Process != null && !b.Process.HasExited && !b.IsHidden);
+                bool shouldHide = visibleCount > 0;
+                
+                foreach (var bot in bots)
+                {
+                    if (bot.Process != null && !bot.Process.HasExited)
+                    {
+                        bot.Process.Refresh();
+                        
+                        // Pencere handle'ı bul (tek tek gizleme ile aynı mantık)
+                        IntPtr handle = IntPtr.Zero;
+                        
+                        // 1. Önce kayıtlı handle'ı kontrol et
+                        if (bot.WindowHandle != IntPtr.Zero && NativeMethods.IsWindow(bot.WindowHandle))
+                        {
+                            int length = NativeMethods.GetWindowTextLength(bot.WindowHandle);
+                            if (length > 0)
+                            {
+                                var sb = new StringBuilder(length + 1);
+                                NativeMethods.GetWindowText(bot.WindowHandle, sb, sb.Capacity);
+                                string title = sb.ToString();
+                                
+                                if (title.Contains("RSBot") || title.Contains("Silkroad") || title.Contains("SRO"))
+                                {
+                                    handle = bot.WindowHandle;
+                                }
+                            }
+                        }
+                        
+                        // 2. Process'in MainWindowHandle'ını dene
+                        if (handle == IntPtr.Zero && bot.Process.MainWindowHandle != IntPtr.Zero && 
+                            NativeMethods.IsWindow(bot.Process.MainWindowHandle))
+                        {
+                            int length = NativeMethods.GetWindowTextLength(bot.Process.MainWindowHandle);
+                            if (length > 0)
+                            {
+                                var sb = new StringBuilder(length + 1);
+                                NativeMethods.GetWindowText(bot.Process.MainWindowHandle, sb, sb.Capacity);
+                                string title = sb.ToString();
+                                
+                                if (title.Contains("RSBot") || title.Contains("Silkroad") || title.Contains("SRO"))
+                                {
+                                    handle = bot.Process.MainWindowHandle;
+                                }
+                            }
+                        }
+                        
+                        // 3. Son çare olarak FindMainWindow'u kullan
+                        if (handle == IntPtr.Zero)
+                        {
+                            handle = NativeMethods.FindMainWindow(bot.Process.Id);
+                        }
+                        
+                        if (handle != IntPtr.Zero)
+                        {
+                            bot.WindowHandle = handle;
+                            
+                            if (shouldHide)
+                            {
+                                // Gizleme - tek tek gizleme ile aynı mantık
+                                NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
+                                
+                                // Başarısız olursa minimize et
+                                if (NativeMethods.IsWindowVisible(handle))
+                                {
+                                    NativeMethods.ShowWindow(handle, NativeMethods.SW_MINIMIZE);
+                                }
+                                
+                                bot.IsHidden = true;
+                            }
+                            else
+                            {
+                                // Gösterme - tek tek gösterme ile aynı mantık
+                                NativeMethods.ShowWindow(handle, NativeMethods.SW_RESTORE);
+                                await Task.Delay(100);
+                                
+                                NativeMethods.ShowWindow(handle, NativeMethods.SW_NORMAL);
+                                await Task.Delay(100);
+                                
+                                NativeMethods.ShowWindow(handle, NativeMethods.SW_SHOW);
+                                await Task.Delay(100);
+                                
+                                bot.IsHidden = false;
+                            }
+                        }
+                    }
+                }
+                
+                // Buton metnini güncelle
+                btnToggleAllVisibility.Text = shouldHide ? "👁 Tümünü Göster" : "👁 Tümünü Gizle";
+                
+                RefreshBotList();
+                SaveRunningBots();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+                btnToggleAllVisibility.Enabled = true;
+            }
+        }
+
+        private async void btnHideShow_Click(object sender, EventArgs e)
         {
             // Seçili bot yok ise bir şey yapma
             if (lvwBots.SelectedItems.Count == 0) return;
@@ -1003,6 +1390,10 @@ namespace RSBotManager
                 RefreshBotList();
                 return;
             }
+            
+            // Butonu devre dışı bırak
+            btnHideShow.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
             
             try {
                 // Process bilgilerini güncelle
@@ -1023,7 +1414,6 @@ namespace RSBotManager
                         // RSBot ana penceresi başlığını kontrol et
                         if (title.Contains("RSBot") || title.Contains("Silkroad") || title.Contains("SRO")) {
                             handle = botInstance.WindowHandle;
-                            Console.WriteLine($"Kayıtlı RSBot penceresi bulundu: {title}");
                         }
                     }
                 }
@@ -1040,7 +1430,6 @@ namespace RSBotManager
                         
                         if (title.Contains("RSBot") || title.Contains("Silkroad") || title.Contains("SRO")) {
                             handle = botInstance.Process.MainWindowHandle;
-                            Console.WriteLine($"MainWindow RSBot penceresi bulundu: {title}");
                         }
                     }
                 }
@@ -1048,14 +1437,6 @@ namespace RSBotManager
                 // 3. Son çare olarak FindMainWindow'u kullan
                 if (handle == IntPtr.Zero) {
                     handle = NativeMethods.FindMainWindow(botInstance.Process.Id);
-                    if (handle != IntPtr.Zero) {
-                        int length = NativeMethods.GetWindowTextLength(handle);
-                        if (length > 0) {
-                            var sb = new StringBuilder(length + 1);
-                            NativeMethods.GetWindowText(handle, sb, sb.Capacity);
-                            Console.WriteLine($"FindMainWindow ile RSBot penceresi bulundu: {sb.ToString()}");
-                        }
-                    }
                 }
                 
                 // Pencere bulunamadıysa hata ver
@@ -1073,22 +1454,16 @@ namespace RSBotManager
                 // Gizleme/gösterme işlemini gerçekleştir
                 if (botInstance.IsHidden || !isCurrentlyVisible)  // Gizliyse göster
                 {
-                    Console.WriteLine("RSBot penceresini gösterme işlemi başlatılıyor...");
-                    
                     // Komut dizisi uygula (daha güvenilir)
-                    // 1. İlk restore (minimize veya hide edilmiş olabilir)
-                    bool step1 = NativeMethods.ShowWindow(handle, NativeMethods.SW_RESTORE);
-                    System.Threading.Thread.Sleep(300);
+                    NativeMethods.ShowWindow(handle, NativeMethods.SW_RESTORE);
+                    await Task.Delay(100);
                     
-                    // 2. Sonra normal modda göster
-                    bool step2 = NativeMethods.ShowWindow(handle, NativeMethods.SW_NORMAL);
-                    System.Threading.Thread.Sleep(300);
+                    NativeMethods.ShowWindow(handle, NativeMethods.SW_NORMAL);
+                    await Task.Delay(100);
                     
-                    // 3. Sonra SHOW komutunu uygula
-                    bool step3 = NativeMethods.ShowWindow(handle, NativeMethods.SW_SHOW);
-                    System.Threading.Thread.Sleep(300);
+                    NativeMethods.ShowWindow(handle, NativeMethods.SW_SHOW);
+                    await Task.Delay(100);
                     
-                    // 4. Son olarak pencereyi öne getir
                     NativeMethods.SetForegroundWindow(handle);
                     
                     // Bot durumunu güncelle
@@ -1096,7 +1471,6 @@ namespace RSBotManager
                     
                     // Sonucu kontrol et
                     bool nowVisible = NativeMethods.IsWindowVisible(handle);
-                    Console.WriteLine($"Gösterme işlemi sonucu: {nowVisible} (adımlar: {step1}-{step2}-{step3})");
                     
                     if (!nowVisible) {
                         MessageBox.Show("RSBot penceresi gösterme işlemi başarısız oldu. Lütfen tekrar deneyin.");
@@ -1104,43 +1478,17 @@ namespace RSBotManager
                 }
                 else  // Görünürse gizle
                 {
-                    Console.WriteLine("RSBot penceresini gizleme işlemi başlatılıyor...");
+                    // Basit ve hızlı gizleme
+                    NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
                     
-                    // En etkili gizleme yöntemini dene
-                    // 1. Önce WM_SYSCOMMAND mesaj yöntemini dene
-                    bool success = NativeMethods.HideWindowWithMessage(handle);
-                    
-                    if (!success || NativeMethods.IsWindowVisible(handle))
+                    // Başarısız olursa minimize et
+                    if (NativeMethods.IsWindowVisible(handle))
                     {
-                        // 2. Doğrudan gizleme yöntemini dene
-                        bool step1 = NativeMethods.ShowWindow(handle, NativeMethods.SW_MINIMIZE);
-                        System.Threading.Thread.Sleep(300);
-                        bool step2 = NativeMethods.ShowWindow(handle, NativeMethods.SW_HIDE);
-                        
-                        // 3. Başarısızsa style manipülasyonunu dene
-                        if (NativeMethods.IsWindowVisible(handle)) 
-                        {
-                            bool altMethod = NativeMethods.HideWindowAlternative(handle);
-                            
-                            // 4. Hala başarısızsa son çare
-                            if (!altMethod || NativeMethods.IsWindowVisible(handle)) 
-                            {
-                                NativeMethods.ShowWindow(handle, NativeMethods.SW_FORCEMINIMIZE);
-                                Console.WriteLine("Son çare: FORCEMINIMIZE kullanıldı");
-                            }
-                        }
+                        NativeMethods.ShowWindow(handle, NativeMethods.SW_MINIMIZE);
                     }
                     
                     // Her durumda gizli olarak işaretle
                     botInstance.IsHidden = true;
-                    
-                    // Sonucu kontrol et ve rapor et
-                    bool stillVisible = NativeMethods.IsWindowVisible(handle);
-                    Console.WriteLine($"Gizleme işlemi sonucu: {!stillVisible}");
-                    
-                    if (stillVisible) {
-                        MessageBox.Show("RSBot penceresi tam olarak gizlenemedi. En azından minimize edildi.");
-                    }
                 }
                 
                 // Buton metnini güncelle
@@ -1153,19 +1501,27 @@ namespace RSBotManager
             catch (Exception ex) {
                 MessageBox.Show($"Gizle/Göster işlemi sırasında hata: {ex.Message}");
             }
+            finally {
+                this.Cursor = Cursors.Default;
+                btnHideShow.Enabled = true;
+            }
         }
 
         // Form controls
         private TextBox txtRSBotPath = null!;
-        private TextBox txtProfileName = null!;
-        private ComboBox cmbSavedProfiles = null!;
+        private TextBox txtDelay = null!;
+        private ListBox lstProfiles = null!;
         private Button btnBrowse = null!;
-        private Button btnStart = null!;
+        private Button btnStartAll = null!;
         private Button btnStop = null!;
-        private Button btnRefresh = null!;
         private Button btnHideShow = null!;
         private Button btnAddProfile = null!;
         private Button btnRemoveProfile = null!;
+        private Button btnMoveUp = null!;
+        private Button btnMoveDown = null!;
+        private Button btnStartSelected = null!;
+        private Button btnStopAll = null!;
+        private Button btnToggleAllVisibility = null!;
         private ListView lvwBots = null!;
     }
 
