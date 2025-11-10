@@ -26,12 +26,16 @@ namespace RSBotManager
         private StatusStrip statusStrip;
         private ToolStripStatusLabel statusLabel;
         private ToolStripStatusLabel botCountLabel;
+        private ToolStripStatusLabel languageLabel;
+        private ToolStripComboBox languageComboBox;
         private System.Windows.Forms.Timer refreshTimer;
         private int startDelay = 5; // Başlatma gecikmesi (saniye)
+        private string settingsLanguageFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "language.json");
 
         public Form1()
         {
             InitializeComponent();
+            LoadLanguageSettings();
             InitializeUI();
             SetupStatusBar();
             LoadSettings();
@@ -47,12 +51,28 @@ namespace RSBotManager
             statusStrip.Dock = DockStyle.Bottom;
             statusStrip.BackColor = Color.FromArgb(240, 240, 240);
             
-            statusLabel = new ToolStripStatusLabel("RSBot Manager Hazır");
+            // Sol tarafta dil seçici
+            languageLabel = new ToolStripStatusLabel(LanguageManager.GetText("Language"));
+            languageLabel.Margin = new Padding(5, 3, 0, 2);
+            
+            languageComboBox = new ToolStripComboBox();
+            languageComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            languageComboBox.Width = 100;
+            foreach (var lang in LanguageManager.SupportedLanguages)
+            {
+                languageComboBox.Items.Add(lang);
+            }
+            languageComboBox.SelectedItem = LanguageManager.CurrentLanguage;
+            languageComboBox.SelectedIndexChanged += LanguageComboBox_SelectedIndexChanged;
+            
+            statusLabel = new ToolStripStatusLabel(LanguageManager.GetText("Ready"));
             statusLabel.Spring = true;
             
-            botCountLabel = new ToolStripStatusLabel("Çalışan Bot: 0");
+            botCountLabel = new ToolStripStatusLabel(LanguageManager.GetText("RunningBots") + " 0");
             botCountLabel.Alignment = ToolStripItemAlignment.Right;
             
+            statusStrip.Items.Add(languageLabel);
+            statusStrip.Items.Add(languageComboBox);
             statusStrip.Items.Add(statusLabel);
             statusStrip.Items.Add(botCountLabel);
             
@@ -68,14 +88,176 @@ namespace RSBotManager
         private void RefreshTimer_Tick(object sender, EventArgs e)
         {
             int runningBots = bots.Count(b => b.Process != null && !b.Process.HasExited);
-            botCountLabel.Text = $"Çalışan Bot: {runningBots}";
+            botCountLabel.Text = $"{LanguageManager.GetText("RunningBots")} {runningBots}";
             RefreshBotList();
+        }
+        
+        private void LanguageComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (languageComboBox.SelectedItem != null)
+            {
+                LanguageManager.CurrentLanguage = languageComboBox.SelectedItem.ToString();
+                SaveLanguageSettings();
+                UpdateUILanguage();
+            }
+        }
+        
+        private void LoadLanguageSettings()
+        {
+            try
+            {
+                if (File.Exists(settingsLanguageFilePath))
+                {
+                    string json = File.ReadAllText(settingsLanguageFilePath);
+                    var settings = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                    
+                    if (settings != null && settings.TryGetValue("Language", out string language))
+                    {
+                        if (LanguageManager.SupportedLanguages.Contains(language))
+                        {
+                            LanguageManager.CurrentLanguage = language;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Hata durumunda Türkçe varsayılan dil olarak kalacak
+            }
+        }
+        
+        private void SaveLanguageSettings()
+        {
+            try
+            {
+                var settings = new Dictionary<string, string>
+                {
+                    { "Language", LanguageManager.CurrentLanguage }
+                };
+                
+                string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(settingsLanguageFilePath, json);
+            }
+            catch
+            {
+                // Hata durumunda sessizce devam et
+            }
+        }
+        
+        private void UpdateUILanguage()
+        {
+            // Form başlığı
+            this.Text = LanguageManager.GetText("FormTitle");
+            
+            // Sol panel
+            if (this.Controls.Count > 0)
+            {
+                var mainSplitContainer = this.Controls.OfType<SplitContainer>().FirstOrDefault();
+                if (mainSplitContainer != null)
+                {
+                    var leftPanel = mainSplitContainer.Panel1.Controls.OfType<Panel>().FirstOrDefault();
+                    if (leftPanel != null)
+                    {
+                        var lblProfiles = leftPanel.Controls.OfType<Label>().FirstOrDefault();
+                        if (lblProfiles != null)
+                        {
+                            lblProfiles.Text = LanguageManager.GetText("ProfileList");
+                        }
+                    }
+                }
+            }
+            
+            // Butonlar
+            btnAddProfile.Text = LanguageManager.GetText("Add");
+            btnRemoveProfile.Text = LanguageManager.GetText("Remove");
+            btnBrowse.Text = LanguageManager.GetText("Browse");
+            btnStartSelected.Text = LanguageManager.GetText("StartSelected");
+            btnStop.Text = LanguageManager.GetText("Stop");
+            btnStartAll.Text = LanguageManager.GetText("StartAll");
+            btnStopAll.Text = LanguageManager.GetText("StopAll");
+            
+            // ListView kolonları
+            if (lvwBots.Columns.Count >= 4)
+            {
+                lvwBots.Columns[0].Text = LanguageManager.GetText("ProfileName");
+                lvwBots.Columns[1].Text = LanguageManager.GetText("PID");
+                lvwBots.Columns[2].Text = LanguageManager.GetText("Status");
+                lvwBots.Columns[3].Text = LanguageManager.GetText("Display");
+            }
+            
+            // Status bar
+            languageLabel.Text = LanguageManager.GetText("Language");
+            statusLabel.Text = LanguageManager.GetText("Ready");
+            int runningBots = bots.Count(b => b.Process != null && !b.Process.HasExited);
+            botCountLabel.Text = $"{LanguageManager.GetText("RunningBots")} {runningBots}";
+            
+            // Context menu
+            var contextMenuStrip = txtRSBotPath.ContextMenuStrip;
+            if (contextMenuStrip != null && contextMenuStrip.Items.Count > 0)
+            {
+                contextMenuStrip.Items[0].Text = LanguageManager.GetText("ResetCommandFormat");
+            }
+            
+            // Label'ları güncelle
+            UpdateLabels();
+            
+            // Gizle/Göster butonunu güncelle
+            UpdateHideShowButtonText();
+            UpdateToggleAllVisibilityButtonText();
+            
+            // Bot listesini yenile
+            RefreshBotList();
+        }
+        
+        private void UpdateLabels()
+        {
+            // Sağ panel içindeki label'ları güncelle
+            var mainSplitContainer = this.Controls.OfType<SplitContainer>().FirstOrDefault();
+            if (mainSplitContainer != null)
+            {
+                var rightPanel = mainSplitContainer.Panel2.Controls.OfType<TableLayoutPanel>().FirstOrDefault();
+                if (rightPanel != null && rightPanel.Controls.Count > 0)
+                {
+                    var topPanel = rightPanel.Controls[0] as TableLayoutPanel;
+                    if (topPanel != null)
+                    {
+                        foreach (Control ctrl in topPanel.Controls)
+                        {
+                            if (ctrl is Label label)
+                            {
+                                if (label.Text.Contains("RSBot") || label.Text.Contains("Путь"))
+                                {
+                                    label.Text = LanguageManager.GetText("RSBotPath");
+                                }
+                                else if (label.Text.Contains("Başlatma") || label.Text.Contains("Интервал") || label.Text.Contains("Start"))
+                                {
+                                    label.Text = LanguageManager.GetText("StartDelay");
+                                }
+                                else if (label.Text.Contains("saniye") || label.Text.Contains("second") || label.Text.Contains("секунд") || label.Text.Contains("Sekunden"))
+                                {
+                                    label.Text = LanguageManager.GetText("Seconds");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        private void UpdateToggleAllVisibilityButtonText()
+        {
+            if (btnToggleAllVisibility != null)
+            {
+                int visibleCount = bots.Count(b => b.Process != null && !b.Process.HasExited && !b.IsHidden);
+                bool shouldHide = visibleCount > 0;
+                btnToggleAllVisibility.Text = shouldHide ? LanguageManager.GetText("HideAll") : LanguageManager.GetText("ShowAll");
+            }
         }
 
         private void InitializeUI()
         {
             // Form settings
-            this.Text = "RSBot Manager";
+            this.Text = LanguageManager.GetText("FormTitle");
             this.MinimumSize = new Size(1100, 600);
             this.Size = new Size(1200, 700);
             this.BackColor = Color.FromArgb(245, 245, 250);
@@ -84,13 +266,13 @@ namespace RSBotManager
             
             // Create context menu for changing command format
             var contextMenuStrip = new ContextMenuStrip();
-            var resetCommandFormatItem = contextMenuStrip.Items.Add("Komut Formatını Sıfırla");
+            var resetCommandFormatItem = contextMenuStrip.Items.Add(LanguageManager.GetText("ResetCommandFormat"));
             resetCommandFormatItem.Click += (s, e) => 
             {
                 commandFormat = "ask";
                 SaveSettings();
-                MessageBox.Show("Komut formatı sıfırlandı. Bir sonraki bot başlatıldığında format seçimi istenecek.", 
-                    "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(LanguageManager.GetText("CommandFormatReset"), 
+                    LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
 
             // Ana layout: Sol panel (profiller) + Sağ panel (üst ayarlar + alt bot listesi)
@@ -116,7 +298,7 @@ namespace RSBotManager
 
             var lblProfiles = new Label
             {
-                Text = "Profil Listesi",
+                Text = LanguageManager.GetText("ProfileList"),
                 Dock = DockStyle.Top,
                 Font = new Font(this.Font.FontFamily, 11F, FontStyle.Bold),
                 Height = 35,
@@ -157,7 +339,7 @@ namespace RSBotManager
 
             btnAddProfile = new Button
             {
-                Text = "Ekle",
+                Text = LanguageManager.GetText("Add"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(0, 0, 0, 3),
                 FlatStyle = FlatStyle.Flat,
@@ -169,7 +351,7 @@ namespace RSBotManager
 
             btnRemoveProfile = new Button
             {
-                Text = "Çıkar",
+                Text = LanguageManager.GetText("Remove"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(0, 0, 0, 3),
                 FlatStyle = FlatStyle.Flat,
@@ -244,7 +426,7 @@ namespace RSBotManager
 
             var lblRSBotPath = new Label
             {
-                Text = "RSBot Yolu:",
+                Text = LanguageManager.GetText("RSBotPath"),
                 Anchor = AnchorStyles.Left,
                 TextAlign = ContentAlignment.MiddleLeft,
                 AutoSize = true
@@ -272,7 +454,7 @@ namespace RSBotManager
 
             btnBrowse = new Button
             {
-                Text = "Gözat",
+                Text = LanguageManager.GetText("Browse"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(3, 4, 0, 0),
                 FlatStyle = FlatStyle.System
@@ -283,7 +465,7 @@ namespace RSBotManager
 
             var lblDelay = new Label
             {
-                Text = "Başlatma Aralığı:",
+                Text = LanguageManager.GetText("StartDelay"),
                 Anchor = AnchorStyles.Left,
                 TextAlign = ContentAlignment.MiddleLeft,
                 AutoSize = true
@@ -299,7 +481,7 @@ namespace RSBotManager
 
             var lblDelayUnit = new Label
             {
-                Text = "saniye",
+                Text = LanguageManager.GetText("Seconds"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(5, 5, 0, 0),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -308,7 +490,7 @@ namespace RSBotManager
             // Satır 1 butonları: Seçili Profili Başlat, Durdur, Gizle/Göster
             btnStartSelected = new Button
             {
-                Text = "▶ Seçili Profili Başlat",
+                Text = LanguageManager.GetText("StartSelected"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(0, 5, 3, 3),
                 FlatStyle = FlatStyle.Flat,
@@ -322,7 +504,7 @@ namespace RSBotManager
 
             btnStop = new Button
             {
-                Text = "⏹ Durdur",
+                Text = LanguageManager.GetText("Stop"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(3, 5, 3, 3),
                 FlatStyle = FlatStyle.Flat,
@@ -336,7 +518,7 @@ namespace RSBotManager
 
             btnHideShow = new Button
             {
-                Text = "👁 Gizle/Göster",
+                Text = LanguageManager.GetText("HideShow"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(3, 5, 0, 3),
                 FlatStyle = FlatStyle.Flat,
@@ -351,7 +533,7 @@ namespace RSBotManager
             // Satır 2 butonları: Tümünü Başlat, Tümünü Durdur, Tümünü Gizle/Göster
             btnStartAll = new Button
             {
-                Text = "▶ Tümünü Başlat",
+                Text = LanguageManager.GetText("StartAll"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(0, 3, 3, 0),
                 FlatStyle = FlatStyle.Flat,
@@ -365,7 +547,7 @@ namespace RSBotManager
 
             btnStopAll = new Button
             {
-                Text = "⏹ Tümünü Durdur",
+                Text = LanguageManager.GetText("StopAll"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(3, 3, 3, 0),
                 FlatStyle = FlatStyle.Flat,
@@ -379,7 +561,7 @@ namespace RSBotManager
 
             btnToggleAllVisibility = new Button
             {
-                Text = "👁 Tümünü Gizle",
+                Text = LanguageManager.GetText("HideAll"),
                 Dock = DockStyle.Fill,
                 Margin = new Padding(3, 3, 0, 0),
                 FlatStyle = FlatStyle.Flat,
@@ -422,10 +604,10 @@ namespace RSBotManager
                 BackColor = Color.White
             };
 
-            lvwBots.Columns.Add("Profil Adı", 200);
-            lvwBots.Columns.Add("PID", 80);
-            lvwBots.Columns.Add("Durum", 120);
-            lvwBots.Columns.Add("Görüntü", 100);
+            lvwBots.Columns.Add(LanguageManager.GetText("ProfileName"), 200);
+            lvwBots.Columns.Add(LanguageManager.GetText("PID"), 80);
+            lvwBots.Columns.Add(LanguageManager.GetText("Status"), 120);
+            lvwBots.Columns.Add(LanguageManager.GetText("Display"), 100);
 
             rightPanel.Controls.Add(topPanel, 0, 0);
             rightPanel.Controls.Add(lvwBots, 0, 1);
@@ -516,7 +698,7 @@ namespace RSBotManager
             // Profil adı girmek için dialog oluştur
             using (var inputForm = new Form())
             {
-                inputForm.Text = "Yeni Profil Ekle";
+                inputForm.Text = LanguageManager.GetText("AddNewProfile");
                 inputForm.Size = new Size(400, 150);
                 inputForm.StartPosition = FormStartPosition.CenterParent;
                 inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -525,7 +707,7 @@ namespace RSBotManager
 
                 var lblPrompt = new Label
                 {
-                    Text = "Profil Adı:",
+                    Text = LanguageManager.GetText("ProfileNameLabel"),
                     Location = new Point(20, 20),
                     Size = new Size(350, 20)
                 };
@@ -538,7 +720,7 @@ namespace RSBotManager
 
                 var btnOK = new Button
                 {
-                    Text = "Kaydet",
+                    Text = LanguageManager.GetText("Save"),
                     DialogResult = DialogResult.OK,
                     Location = new Point(200, 80),
                     Size = new Size(80, 30)
@@ -546,7 +728,7 @@ namespace RSBotManager
 
                 var btnCancel = new Button
                 {
-                    Text = "İptal",
+                    Text = LanguageManager.GetText("Cancel"),
                     DialogResult = DialogResult.Cancel,
                     Location = new Point(290, 80),
                     Size = new Size(70, 30)
@@ -562,14 +744,14 @@ namespace RSBotManager
                     
                     if (string.IsNullOrWhiteSpace(profileName))
                     {
-                        MessageBox.Show("Lütfen bir profil adı girin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(LanguageManager.GetText("EnterProfileName"), LanguageManager.GetText("Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     
                     // Aynı isimde profil varsa uyar
                     if (savedProfiles.Contains(profileName))
                     {
-                        MessageBox.Show($"'{profileName}' isimli profil zaten kayıtlı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(LanguageManager.GetText("ProfileAlreadyExists", profileName), LanguageManager.GetText("Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     
@@ -581,7 +763,7 @@ namespace RSBotManager
                     // Yeni eklenen profili seç
                     lstProfiles.SelectedIndex = lstProfiles.Items.Count - 1;
                     
-                    MessageBox.Show($"'{profileName}' profili kaydedildi.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(LanguageManager.GetText("ProfileSaved", profileName), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }
@@ -592,7 +774,7 @@ namespace RSBotManager
             
             string profileName = lstProfiles.SelectedItem.ToString();
             
-            if (MessageBox.Show($"'{profileName}' profilini silmek istediğinizden emin misiniz?", "Profil Silme", 
+            if (MessageBox.Show(LanguageManager.GetText("ConfirmDeleteProfile", profileName), LanguageManager.GetText("DeleteProfile"), 
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 int selectedIndex = lstProfiles.SelectedIndex;
@@ -673,20 +855,20 @@ namespace RSBotManager
         {
             if (string.IsNullOrWhiteSpace(txtRSBotPath.Text))
             {
-                MessageBox.Show("Lütfen önce RSBot yolunu seçin.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(LanguageManager.GetText("SelectRSBotPath"), LanguageManager.GetText("Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (savedProfiles.Count == 0)
             {
-                MessageBox.Show("Başlatılacak profil bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(LanguageManager.GetText("NoProfilesFound"), LanguageManager.GetText("Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             // Delay değerini al
             if (!int.TryParse(txtDelay.Text, out int delay) || delay < 0)
             {
-                MessageBox.Show("Lütfen geçerli bir başlatma aralığı girin (0 veya daha büyük).", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(LanguageManager.GetText("SelectRSBotPath"), LanguageManager.GetText("Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 txtDelay.Focus();
                 return;
             }
@@ -703,7 +885,7 @@ namespace RSBotManager
 
             try
             {
-                statusLabel.Text = "Botlar başlatılıyor...";
+                statusLabel.Text = LanguageManager.GetText("BotsStarting");
 
                 for (int i = 0; i < savedProfiles.Count; i++)
                 {
@@ -713,12 +895,12 @@ namespace RSBotManager
                     var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
                     if (existingBot != null)
                     {
-                        statusLabel.Text = $"'{profileName}' zaten çalışıyor, atlanıyor...";
+                        statusLabel.Text = LanguageManager.GetText("AlreadyRunning", profileName);
                         await Task.Delay(1000);
                         continue;
                     }
 
-                    statusLabel.Text = $"Başlatılıyor: {profileName} ({i + 1}/{savedProfiles.Count})";
+                    statusLabel.Text = LanguageManager.GetText("StartingProfile", profileName, i + 1, savedProfiles.Count);
                     
                     // Botu başlat
                     await StartBot(profileName);
@@ -728,20 +910,20 @@ namespace RSBotManager
                     {
                         for (int countdown = startDelay; countdown > 0; countdown--)
                         {
-                            statusLabel.Text = $"Sonraki bot {countdown} saniye içinde başlatılacak...";
+                            statusLabel.Text = LanguageManager.GetText("NextBotIn", countdown);
                             await Task.Delay(1000);
                         }
                     }
                 }
 
-                statusLabel.Text = "Tüm botlar başlatıldı!";
+                statusLabel.Text = LanguageManager.GetText("AllBotsStarted");
                 await Task.Delay(2000);
-                statusLabel.Text = "RSBot Manager Hazır";
+                statusLabel.Text = LanguageManager.GetText("Ready");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Botlar başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                statusLabel.Text = "Hata oluştu!";
+                MessageBox.Show($"{LanguageManager.GetText("Error")}: {ex.Message}", LanguageManager.GetText("Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                statusLabel.Text = LanguageManager.GetText("Error");
             }
             finally
             {
@@ -902,7 +1084,7 @@ namespace RSBotManager
         {
             if (lvwBots.SelectedItems.Count == 0)
             {
-                btnHideShow.Text = "👁 Gizle/Göster";
+                btnHideShow.Text = LanguageManager.GetText("HideShow");
                 btnHideShow.BackColor = Color.FromArgb(108, 117, 125); // Gray for inactive
                 btnHideShow.ForeColor = Color.White;
                 return;
@@ -915,20 +1097,20 @@ namespace RSBotManager
             {
                 if (botInstance.IsHidden)
                 {
-                    btnHideShow.Text = "👁 Göster";
+                    btnHideShow.Text = LanguageManager.GetText("Show");
                     btnHideShow.BackColor = Color.FromArgb(0, 123, 255); // Blue for Show
                     btnHideShow.ForeColor = Color.White;
                 }
                 else
                 {
-                    btnHideShow.Text = "👁 Gizle";
+                    btnHideShow.Text = LanguageManager.GetText("Hide");
                     btnHideShow.BackColor = Color.FromArgb(40, 167, 69); // Green for Hide
                     btnHideShow.ForeColor = Color.White;
                 }
             }
             else
             {
-                btnHideShow.Text = "👁 Gizle/Göster";
+                btnHideShow.Text = LanguageManager.GetText("HideShow");
                 btnHideShow.BackColor = Color.FromArgb(108, 117, 125); // Gray for inactive
                 btnHideShow.ForeColor = Color.White;
             }
@@ -986,8 +1168,8 @@ namespace RSBotManager
                         
                         var pidItem = item.SubItems.Add(bot.Process.Id.ToString());
                         
-                        var statusItem = item.SubItems.Add(bot.Process.HasExited ? "Kapalı" : "Çalışıyor");
-                        var displayItem = item.SubItems.Add(bot.IsHidden ? "Gizli" : "Görünür");
+                        var statusItem = item.SubItems.Add(bot.Process.HasExited ? LanguageManager.GetText("Closed") : LanguageManager.GetText("Running"));
+                        var displayItem = item.SubItems.Add(bot.IsHidden ? LanguageManager.GetText("Hidden") : LanguageManager.GetText("Visible"));
                         
                         // Bot durumuna göre renklendirme
                         if (bot.Process.HasExited)
@@ -995,7 +1177,7 @@ namespace RSBotManager
                             // Kapalı bot - kırmızı
                             item.ForeColor = Color.Red;
                             item.BackColor = Color.FromArgb(255, 240, 240);
-                            statusItem.Text = "✘ Kapalı";
+                            statusItem.Text = LanguageManager.GetText("Closed");
                             statusItem.ForeColor = Color.Red;
                         }
                         else if (bot.IsHidden)
@@ -1003,9 +1185,9 @@ namespace RSBotManager
                             // Gizli bot - mavi
                             item.ForeColor = Color.DarkBlue;
                             item.BackColor = Color.FromArgb(240, 240, 255);
-                            statusItem.Text = "✓ Çalışıyor";
+                            statusItem.Text = LanguageManager.GetText("Running");
                             statusItem.ForeColor = Color.Green;
-                            displayItem.Text = "👁️ Gizli";
+                            displayItem.Text = LanguageManager.GetText("Hidden");
                             displayItem.ForeColor = Color.Blue;
                         }
                         else
@@ -1013,9 +1195,9 @@ namespace RSBotManager
                             // Çalışan ve görünen bot - yeşil
                             item.ForeColor = Color.DarkGreen;
                             item.BackColor = Color.FromArgb(240, 255, 240);
-                            statusItem.Text = "✓ Çalışıyor";
+                            statusItem.Text = LanguageManager.GetText("Running");
                             statusItem.ForeColor = Color.Green;
-                            displayItem.Text = "🖥️ Görünür";
+                            displayItem.Text = LanguageManager.GetText("Visible");
                             displayItem.ForeColor = Color.Black;
                         }
                         
@@ -1195,7 +1377,7 @@ namespace RSBotManager
             var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
             if (existingBot != null)
             {
-                MessageBox.Show($"'{profileName}' zaten çalışıyor.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(LanguageManager.GetText("AlreadyRunning", profileName), LanguageManager.GetText("Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             
@@ -1204,13 +1386,13 @@ namespace RSBotManager
             
             try
             {
-                statusLabel.Text = $"Başlatılıyor: {profileName}";
+                statusLabel.Text = LanguageManager.GetText("BotsStarting");
                 await StartBot(profileName);
-                statusLabel.Text = "RSBot Manager Hazır";
+                statusLabel.Text = LanguageManager.GetText("Ready");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Bot başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"{LanguageManager.GetText("Error")}: {ex.Message}", LanguageManager.GetText("Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -1223,12 +1405,12 @@ namespace RSBotManager
         {
             if (bots.Count == 0)
             {
-                MessageBox.Show("Çalışan bot bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(LanguageManager.GetText("NoRunningBots"), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             
-            if (MessageBox.Show($"{bots.Count} adet çalışan botu durdurmak istediğinizden emin misiniz?", 
-                "Tümünü Durdur", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(LanguageManager.GetText("ConfirmStopAll", bots.Count), 
+                LanguageManager.GetText("StopAll"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             {
                 return;
             }
@@ -1246,21 +1428,21 @@ namespace RSBotManager
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"'{bot.Name}' durdurulurken hata: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show($"{LanguageManager.GetText("Error")}: {ex.Message}", LanguageManager.GetText("Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
             
             RefreshBotList();
             SaveRunningBots();
-            MessageBox.Show($"{stoppedCount} bot durduruldu.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(LanguageManager.GetText("BotsStopped", stoppedCount), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private async void BtnToggleAllVisibility_Click(object sender, EventArgs e)
         {
             if (bots.Count == 0)
             {
-                MessageBox.Show("Çalışan bot bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(LanguageManager.GetText("NoRunningBots"), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             
@@ -1359,7 +1541,7 @@ namespace RSBotManager
                 }
                 
                 // Buton metnini güncelle
-                btnToggleAllVisibility.Text = shouldHide ? "👁 Tümünü Göster" : "👁 Tümünü Gizle";
+                btnToggleAllVisibility.Text = shouldHide ? LanguageManager.GetText("ShowAll") : LanguageManager.GetText("HideAll");
                 
                 RefreshBotList();
                 SaveRunningBots();
