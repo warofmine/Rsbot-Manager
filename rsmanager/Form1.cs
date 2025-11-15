@@ -35,6 +35,7 @@ namespace RSBotManager
         public Form1()
         {
             InitializeComponent();
+            LoadIcon();
             LoadLanguageSettings();
             InitializeUI();
             SetupStatusBar();
@@ -42,6 +43,23 @@ namespace RSBotManager
             LoadProfiles();
             LoadRunningBots();
             RefreshBotList();
+        }
+        
+        private void LoadIcon()
+        {
+            try
+            {
+                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rsbotmanager.ico");
+                if (File.Exists(iconPath))
+                {
+                    this.Icon = new Icon(iconPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Icon yüklenemezse sessizce devam et
+                Debug.WriteLine($"Icon yüklenemedi: {ex.Message}");
+            }
         }
 
         private void SetupStatusBar()
@@ -1891,3 +1909,4 @@ namespace RSBotManager
         #endregion
     }
 }
+
