@@ -22,7 +22,7 @@ namespace RSBotManager
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
         private string botsStateFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bots_state.json");
         private string profilesFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "profiles.json");
-        private string commandFormat = "direct"; // Default command format: "direct", "name", or "profile"
+        private string commandFormat = "profile"; // Default command format: "profile" (uses --profile parameter)
         private StatusStrip statusStrip;
         private ToolStripStatusLabel statusLabel;
         private ToolStripStatusLabel botCountLabel;
@@ -209,12 +209,7 @@ namespace RSBotManager
             int runningBots = bots.Count(b => b.Process != null && !b.Process.HasExited);
             botCountLabel.Text = $"{LanguageManager.GetText("RunningBots")} {runningBots}";
             
-            // Context menu
-            var contextMenuStrip = txtRSBotPath.ContextMenuStrip;
-            if (contextMenuStrip != null && contextMenuStrip.Items.Count > 0)
-            {
-                contextMenuStrip.Items[0].Text = LanguageManager.GetText("ResetCommandFormat");
-            }
+            // Context menu (no longer needed for command format, but kept for compatibility)
             
             // Label'ları güncelle
             UpdateLabels();
@@ -282,16 +277,8 @@ namespace RSBotManager
             this.Font = new Font("Segoe UI", 9F);
             this.FormClosing += Form1_FormClosing;
             
-            // Create context menu for changing command format
+            // Create context menu (kept for compatibility, but command format is now fixed to --profile)
             var contextMenuStrip = new ContextMenuStrip();
-            var resetCommandFormatItem = contextMenuStrip.Items.Add(LanguageManager.GetText("ResetCommandFormat"));
-            resetCommandFormatItem.Click += (s, e) => 
-            {
-                commandFormat = "ask";
-                SaveSettings();
-                MessageBox.Show(LanguageManager.GetText("CommandFormatReset"), 
-                    LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-            };
 
             // Ana layout: Sol panel (profiller) + Sağ panel (üst ayarlar + alt bot listesi)
             var mainSplitContainer = new SplitContainer
@@ -956,53 +943,8 @@ namespace RSBotManager
         {
             try
             {
-                // Komut formatını belirle
-                string arguments = string.Empty;
-                
-                if (commandFormat == null || commandFormat == "ask")
-                {
-                    // İlk kez sorulacak
-                    DialogResult result = MessageBox.Show(
-                        $"Profil adı için hangi komut formatını kullanmak istersiniz?\n\n" +
-                        "Evet = Doğrudan profil adını kullan (\"profil\")\n" + 
-                        "Hayır = --name parametresini kullan (--name \"profil\")\n" +
-                        "İptal = --profile parametresini kullan (--profile \"profil\")", 
-                        "Komut Formatı Seçimi", 
-                        MessageBoxButtons.YesNoCancel, 
-                        MessageBoxIcon.Question);
-                    
-                    if (result == DialogResult.Yes)
-                    {
-                        arguments = $"\"{profileName}\"";
-                        commandFormat = "direct";
-                    }
-                    else if (result == DialogResult.No)
-                    {
-                        arguments = $"--name \"{profileName}\"";
-                        commandFormat = "name";
-                    }
-                    else if (result == DialogResult.Cancel)
-                    {
-                        arguments = $"--profile \"{profileName}\"";
-                        commandFormat = "profile";
-                    }
-                    else
-                    {
-                        return; // Kullanıcı dialogu kapattı
-                    }
-                    
-                    SaveSettings();
-                }
-                else
-                {
-                    // Kaydedilmiş formatı kullan
-                    if (commandFormat == "direct")
-                        arguments = $"\"{profileName}\"";
-                    else if (commandFormat == "name")
-                        arguments = $"--name \"{profileName}\"";
-                    else if (commandFormat == "profile")
-                        arguments = $"--profile \"{profileName}\"";
-                }
+                // Yeni RSBot sistemi --profile parametresini kullanıyor
+                string arguments = $"--profile \"{profileName}\"";
                 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -1271,10 +1213,8 @@ namespace RSBotManager
                             txtRSBotPath.Text = path;
                         }
                         
-                        if (settings.TryGetValue("CommandFormat", out string format))
-                        {
-                            commandFormat = format;
-                        }
+                        // CommandFormat artık kullanılmıyor, her zaman --profile formatı kullanılıyor
+                        commandFormat = "profile";
                         
                         if (settings.TryGetValue("StartDelay", out string delayStr) && int.TryParse(delayStr, out int delay))
                         {
