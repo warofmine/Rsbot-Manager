@@ -454,6 +454,46 @@ namespace RSBotManager
                     { "Русский", "Формат команды сброшен. При следующем запуске бота будет запрошен выбор формата." },
                     { "Deutsch", "Befehlsformat zurückgesetzt. Bei nächstem Bot-Start wird Formatauswahl angefordert." }
                 }
+            },
+            { "Edit", new Dictionary<string, string>
+                {
+                    { "Türkçe", "Düzenle" },
+                    { "English", "Edit" },
+                    { "Русский", "Редактировать" },
+                    { "Deutsch", "Bearbeiten" }
+                }
+            },
+            { "EditProfile", new Dictionary<string, string>
+                {
+                    { "Türkçe", "Profil Düzenle" },
+                    { "English", "Edit Profile" },
+                    { "Русский", "Редактировать профиль" },
+                    { "Deutsch", "Profil bearbeiten" }
+                }
+            },
+            { "StartWithClient", new Dictionary<string, string>
+                {
+                    { "Türkçe", "Clientli Başlat" },
+                    { "English", "Start with Client" },
+                    { "Русский", "Запустить с клиентом" },
+                    { "Deutsch", "Mit Client starten" }
+                }
+            },
+            { "StartWithoutClient", new Dictionary<string, string>
+                {
+                    { "Türkçe", "Clientsiz Başlat" },
+                    { "English", "Start without Client" },
+                    { "Русский", "Запустить без клиента" },
+                    { "Deutsch", "Ohne Client starten" }
+                }
+            },
+            { "ProfileUpdated", new Dictionary<string, string>
+                {
+                    { "Türkçe", "'{0}' profili güncellendi." },
+                    { "English", "Profile '{0}' updated." },
+                    { "Русский", "Профиль '{0}' обновлен." },
+                    { "Deutsch", "Profil '{0}' aktualisiert." }
+                }
             }
         };
         
