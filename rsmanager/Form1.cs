@@ -18,7 +18,7 @@ namespace RSBotManager
     {
         private string rsbotPath = string.Empty;
         private List<BotInstance> bots = new List<BotInstance>();
-        private List<string> savedProfiles = new List<string>(); // Kaydedilen profil adları
+        private List<Profile> savedProfiles = new List<Profile>(); // Kaydedilen profiller
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
         private string botsStateFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bots_state.json");
         private string profilesFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "profiles.json");
@@ -187,6 +187,7 @@ namespace RSBotManager
             
             // Butonlar
             btnAddProfile.Text = LanguageManager.GetText("Add");
+            btnEditProfile.Text = LanguageManager.GetText("Edit");
             btnRemoveProfile.Text = LanguageManager.GetText("Remove");
             btnBrowse.Text = LanguageManager.GetText("Browse");
             btnStartSelected.Text = LanguageManager.GetText("StartSelected");
@@ -346,13 +347,25 @@ namespace RSBotManager
             {
                 Text = LanguageManager.GetText("Add"),
                 Dock = DockStyle.Fill,
-                Margin = new Padding(0, 0, 0, 3),
+                Margin = new Padding(0, 0, 2, 3),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
                 Font = new Font(this.Font.FontFamily, 10F, FontStyle.Bold)
             };
             btnAddProfile.FlatAppearance.BorderSize = 0;
+
+            btnEditProfile = new Button
+            {
+                Text = LanguageManager.GetText("Edit"),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2, 0, 0, 3),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(13, 110, 253),
+                ForeColor = Color.White,
+                Font = new Font(this.Font.FontFamily, 10F, FontStyle.Bold)
+            };
+            btnEditProfile.FlatAppearance.BorderSize = 0;
 
             btnRemoveProfile = new Button
             {
@@ -392,7 +405,7 @@ namespace RSBotManager
 
             // Butonları panele ekle
             profileButtonsPanel.Controls.Add(btnAddProfile, 0, 0);
-            profileButtonsPanel.SetColumnSpan(btnAddProfile, 2); // Ekle butonu 2 sütun genişliğinde
+            profileButtonsPanel.Controls.Add(btnEditProfile, 1, 0);
             
             profileButtonsPanel.Controls.Add(btnRemoveProfile, 0, 1);
             profileButtonsPanel.SetColumnSpan(btnRemoveProfile, 2); // Çıkar butonu 2 sütun genişliğinde
@@ -624,6 +637,7 @@ namespace RSBotManager
             btnHideShow.Click += btnHideShow_Click;
             lvwBots.SelectedIndexChanged += lvwBots_SelectedIndexChanged;
             btnAddProfile.Click += BtnAddProfile_Click;
+            btnEditProfile.Click += BtnEditProfile_Click;
             btnRemoveProfile.Click += BtnRemoveProfile_Click;
             btnMoveUp.Click += BtnMoveUp_Click;
             btnMoveDown.Click += BtnMoveDown_Click;
@@ -639,6 +653,7 @@ namespace RSBotManager
             btnHideShow.Enabled = false;
             btnHideShow.BackColor = Color.FromArgb(150, 150, 150);
             
+            btnEditProfile.Enabled = false;
             btnRemoveProfile.Enabled = false;
             btnMoveUp.Enabled = false;
             btnMoveDown.Enabled = false;
@@ -651,6 +666,7 @@ namespace RSBotManager
         private void LstProfiles_SelectedIndexChanged(object sender, EventArgs e)
         {
             bool hasSelection = lstProfiles.SelectedIndex >= 0;
+            btnEditProfile.Enabled = hasSelection;
             btnRemoveProfile.Enabled = hasSelection;
             btnMoveUp.Enabled = hasSelection && lstProfiles.SelectedIndex > 0;
             btnMoveDown.Enabled = hasSelection && lstProfiles.SelectedIndex < lstProfiles.Items.Count - 1;
@@ -662,7 +678,7 @@ namespace RSBotManager
             if (lstProfiles.SelectedIndex <= 0) return;
             
             int index = lstProfiles.SelectedIndex;
-            string item = savedProfiles[index];
+            var item = savedProfiles[index];
             
             savedProfiles.RemoveAt(index);
             savedProfiles.Insert(index - 1, item);
@@ -677,7 +693,7 @@ namespace RSBotManager
             if (lstProfiles.SelectedIndex < 0 || lstProfiles.SelectedIndex >= lstProfiles.Items.Count - 1) return;
             
             int index = lstProfiles.SelectedIndex;
-            string item = savedProfiles[index];
+            var item = savedProfiles[index];
             
             savedProfiles.RemoveAt(index);
             savedProfiles.Insert(index + 1, item);
@@ -692,7 +708,7 @@ namespace RSBotManager
             lstProfiles.Items.Clear();
             foreach (var profile in savedProfiles)
             {
-                lstProfiles.Items.Add(profile);
+                lstProfiles.Items.Add(profile.Name);
             }
             
             btnStartAll.Enabled = savedProfiles.Count > 0 && !string.IsNullOrWhiteSpace(txtRSBotPath.Text);
@@ -700,11 +716,18 @@ namespace RSBotManager
         
         private void BtnAddProfile_Click(object sender, EventArgs e)
         {
+            ShowProfileDialog(null);
+        }
+        
+        private void ShowProfileDialog(Profile existingProfile)
+        {
+            bool isEdit = existingProfile != null;
+            
             // Profil adı girmek için dialog oluştur
             using (var inputForm = new Form())
             {
-                inputForm.Text = LanguageManager.GetText("AddNewProfile");
-                inputForm.Size = new Size(400, 150);
+                inputForm.Text = isEdit ? LanguageManager.GetText("EditProfile") : LanguageManager.GetText("AddNewProfile");
+                inputForm.Size = new Size(400, 200);
                 inputForm.StartPosition = FormStartPosition.CenterParent;
                 inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
                 inputForm.MaximizeBox = false;
@@ -720,14 +743,39 @@ namespace RSBotManager
                 var txtInput = new TextBox
                 {
                     Location = new Point(20, 45),
-                    Size = new Size(340, 25)
+                    Size = new Size(340, 25),
+                    Text = isEdit ? existingProfile.Name : ""
+                };
+
+                var chkStartCl = new CheckBox
+                {
+                    Text = LanguageManager.GetText("StartWithClient"),
+                    Location = new Point(20, 80),
+                    Size = new Size(340, 20),
+                    Checked = isEdit ? existingProfile.StartCl : false
+                };
+
+                var chkStartCls = new CheckBox
+                {
+                    Text = LanguageManager.GetText("StartWithoutClient"),
+                    Location = new Point(20, 105),
+                    Size = new Size(340, 20),
+                    Checked = isEdit ? existingProfile.StartCls : false
+                };
+
+                // Checkbox'lar birbirini dışlasın
+                chkStartCl.CheckedChanged += (s, e) => {
+                    if (chkStartCl.Checked) chkStartCls.Checked = false;
+                };
+                chkStartCls.CheckedChanged += (s, e) => {
+                    if (chkStartCls.Checked) chkStartCl.Checked = false;
                 };
 
                 var btnOK = new Button
                 {
                     Text = LanguageManager.GetText("Save"),
                     DialogResult = DialogResult.OK,
-                    Location = new Point(200, 80),
+                    Location = new Point(200, 135),
                     Size = new Size(80, 30)
                 };
 
@@ -735,11 +783,11 @@ namespace RSBotManager
                 {
                     Text = LanguageManager.GetText("Cancel"),
                     DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 80),
+                    Location = new Point(290, 135),
                     Size = new Size(70, 30)
                 };
 
-                inputForm.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOK, btnCancel });
+                inputForm.Controls.AddRange(new Control[] { lblPrompt, txtInput, chkStartCl, chkStartCls, btnOK, btnCancel });
                 inputForm.AcceptButton = btnOK;
                 inputForm.CancelButton = btnCancel;
 
@@ -753,22 +801,47 @@ namespace RSBotManager
                         return;
                     }
                     
-                    // Aynı isimde profil varsa uyar
-                    if (savedProfiles.Contains(profileName))
+                    // Aynı isimde profil varsa uyar (düzenleme sırasında mevcut profili hariç tut)
+                    if (savedProfiles.Any(p => p.Name == profileName && (!isEdit || p != existingProfile)))
                     {
                         MessageBox.Show(LanguageManager.GetText("ProfileAlreadyExists", profileName), LanguageManager.GetText("Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     
-                    // Profili kaydet
-                    savedProfiles.Add(profileName);
-                    RefreshProfileList();
-                    SaveProfiles();
-                    
-                    // Yeni eklenen profili seç
-                    lstProfiles.SelectedIndex = lstProfiles.Items.Count - 1;
-                    
-                    MessageBox.Show(LanguageManager.GetText("ProfileSaved", profileName), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (isEdit)
+                    {
+                        // Mevcut profili güncelle
+                        existingProfile.Name = profileName;
+                        existingProfile.StartCl = chkStartCl.Checked;
+                        existingProfile.StartCls = chkStartCls.Checked;
+                        RefreshProfileList();
+                        SaveProfiles();
+                        
+                        // Güncellenen profili seç
+                        int index = savedProfiles.IndexOf(existingProfile);
+                        if (index >= 0)
+                            lstProfiles.SelectedIndex = index;
+                        
+                        MessageBox.Show(LanguageManager.GetText("ProfileUpdated", profileName), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        // Yeni profili kaydet
+                        var newProfile = new Profile
+                        {
+                            Name = profileName,
+                            StartCl = chkStartCl.Checked,
+                            StartCls = chkStartCls.Checked
+                        };
+                        savedProfiles.Add(newProfile);
+                        RefreshProfileList();
+                        SaveProfiles();
+                        
+                        // Yeni eklenen profili seç
+                        lstProfiles.SelectedIndex = lstProfiles.Items.Count - 1;
+                        
+                        MessageBox.Show(LanguageManager.GetText("ProfileSaved", profileName), LanguageManager.GetText("Info"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                 }
             }
         }
@@ -778,12 +851,14 @@ namespace RSBotManager
             if (lstProfiles.SelectedIndex < 0) return;
             
             string profileName = lstProfiles.SelectedItem.ToString();
+            var profile = savedProfiles.FirstOrDefault(p => p.Name == profileName);
+            if (profile == null) return;
             
             if (MessageBox.Show(LanguageManager.GetText("ConfirmDeleteProfile", profileName), LanguageManager.GetText("DeleteProfile"), 
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 int selectedIndex = lstProfiles.SelectedIndex;
-                savedProfiles.Remove(profileName);
+                savedProfiles.Remove(profile);
                 RefreshProfileList();
                 SaveProfiles();
                 
@@ -798,6 +873,17 @@ namespace RSBotManager
             }
         }
         
+        private void BtnEditProfile_Click(object sender, EventArgs e)
+        {
+            if (lstProfiles.SelectedIndex < 0) return;
+            
+            string profileName = lstProfiles.SelectedItem.ToString();
+            var profile = savedProfiles.FirstOrDefault(p => p.Name == profileName);
+            if (profile == null) return;
+            
+            ShowProfileDialog(profile);
+        }
+        
         private void LoadProfiles()
         {
             try
@@ -805,12 +891,30 @@ namespace RSBotManager
                 if (File.Exists(profilesFilePath))
                 {
                     string json = File.ReadAllText(profilesFilePath);
-                    var profiles = JsonSerializer.Deserialize<List<string>>(json);
                     
-                    if (profiles != null)
+                    // Eski format (List<string>) kontrolü
+                    try
                     {
-                        savedProfiles = profiles;
+                        var profiles = JsonSerializer.Deserialize<List<Profile>>(json);
+                        if (profiles != null)
+                        {
+                            savedProfiles = profiles;
+                            RefreshProfileList();
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        // Yeni format başarısız oldu, eski formatı dene
+                    }
+                    
+                    // Eski format (List<string>) - geriye dönük uyumluluk
+                    var oldProfiles = JsonSerializer.Deserialize<List<string>>(json);
+                    if (oldProfiles != null)
+                    {
+                        savedProfiles = oldProfiles.Select(name => new Profile { Name = name, StartCl = false, StartCls = false }).ToList();
                         RefreshProfileList();
+                        SaveProfiles(); // Yeni formata dönüştür ve kaydet
                     }
                 }
             }
@@ -894,21 +998,21 @@ namespace RSBotManager
 
                 for (int i = 0; i < savedProfiles.Count; i++)
                 {
-                    string profileName = savedProfiles[i];
+                    var profile = savedProfiles[i];
                     
                     // Zaten çalışıyor mu kontrol et
-                    var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
+                    var existingBot = bots.Find(b => b.Name == profile.Name && b.Process != null && !b.Process.HasExited);
                     if (existingBot != null)
                     {
-                        statusLabel.Text = LanguageManager.GetText("AlreadyRunning", profileName);
+                        statusLabel.Text = LanguageManager.GetText("AlreadyRunning", profile.Name);
                         await Task.Delay(1000);
                         continue;
                     }
 
-                    statusLabel.Text = LanguageManager.GetText("StartingProfile", profileName, i + 1, savedProfiles.Count);
+                    statusLabel.Text = LanguageManager.GetText("StartingProfile", profile.Name, i + 1, savedProfiles.Count);
                     
                     // Botu başlat
-                    await StartBot(profileName);
+                    await StartBot(profile);
 
                     // Son bot değilse delay uygula
                     if (i < savedProfiles.Count - 1 && startDelay > 0)
@@ -939,12 +1043,21 @@ namespace RSBotManager
             }
         }
 
-        private async Task StartBot(string profileName)
+        private async Task StartBot(Profile profile)
         {
             try
             {
-                // Yeni RSBot sistemi --profile parametresini kullanıyor
-                string arguments = $"--profile \"{profileName}\"";
+                // RSBot komut formatı: rsbot.exe -p profileadı [startcl|startcls]
+                string arguments = $"-p \"{profile.Name}\"";
+                
+                if (profile.StartCl)
+                {
+                    arguments += " startcl";
+                }
+                else if (profile.StartCls)
+                {
+                    arguments += " startcls";
+                }
                 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -958,7 +1071,7 @@ namespace RSBotManager
                 {
                     BotInstance bot = new BotInstance
                     {
-                        Name = profileName,
+                        Name = profile.Name,
                         Process = process,
                         StartTime = DateTime.Now,
                         IsHidden = false
@@ -979,7 +1092,7 @@ namespace RSBotManager
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"'{profileName}' başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"'{profile.Name}' başlatılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1330,6 +1443,8 @@ namespace RSBotManager
             if (lstProfiles.SelectedIndex < 0) return;
             
             string profileName = lstProfiles.SelectedItem.ToString();
+            var profile = savedProfiles.FirstOrDefault(p => p.Name == profileName);
+            if (profile == null) return;
             
             // Zaten çalışıyor mu kontrol et
             var existingBot = bots.Find(b => b.Name == profileName && b.Process != null && !b.Process.HasExited);
@@ -1345,7 +1460,7 @@ namespace RSBotManager
             try
             {
                 statusLabel.Text = LanguageManager.GetText("BotsStarting");
-                await StartBot(profileName);
+                await StartBot(profile);
                 statusLabel.Text = LanguageManager.GetText("Ready");
             }
             catch (Exception ex)
@@ -1656,6 +1771,7 @@ namespace RSBotManager
         private Button btnStop = null!;
         private Button btnHideShow = null!;
         private Button btnAddProfile = null!;
+        private Button btnEditProfile = null!;
         private Button btnRemoveProfile = null!;
         private Button btnMoveUp = null!;
         private Button btnMoveDown = null!;
@@ -1697,6 +1813,13 @@ namespace RSBotManager
         public DateTime StartTime { get; set; }
         public bool IsHidden { get; set; }
         public long WindowHandleValue { get; set; } // Store as long instead of IntPtr for serialization
+    }
+    
+    public class Profile
+    {
+        public string Name { get; set; } = string.Empty;
+        public bool StartCl { get; set; } = false; // Clientli başlat
+        public bool StartCls { get; set; } = false; // Clientsiz başlat
     }
 
     public static class NativeMethods
