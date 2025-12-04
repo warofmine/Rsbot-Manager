@@ -1047,16 +1047,16 @@ namespace RSBotManager
         {
             try
             {
-                // RSBot komut formatı: rsbot.exe -p profileadı [startcl|startcls]
+                // RSBot komut formatı: rsbot.exe -p profileadı [--launch-client|--launch-clientless]
                 string arguments = $"-p \"{profile.Name}\"";
                 
                 if (profile.StartCl)
                 {
-                    arguments += " startcl";
+                    arguments += " --launch-client";
                 }
                 else if (profile.StartCls)
                 {
-                    arguments += " startcls";
+                    arguments += " --launch-clientless";
                 }
                 
                 ProcessStartInfo psi = new ProcessStartInfo
