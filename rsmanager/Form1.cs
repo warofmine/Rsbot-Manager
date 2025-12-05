@@ -496,6 +496,8 @@ namespace RSBotManager
                 BorderStyle = BorderStyle.FixedSingle,
                 Text = "5"
             };
+            txtDelay.TextChanged += TxtDelay_TextChanged;
+            txtDelay.Leave += TxtDelay_Leave;
 
             var lblDelayUnit = new Label
             {
@@ -1347,6 +1349,11 @@ namespace RSBotManager
         {
             try
             {
+                if (int.TryParse(txtDelay.Text, out int delay) && delay >= 0)
+                {
+                    startDelay = delay;
+                }
+                
                 var settings = new Dictionary<string, string>
                 {
                     { "RSBotPath", txtRSBotPath.Text },
@@ -1360,6 +1367,30 @@ namespace RSBotManager
             catch (Exception ex)
             {
                 MessageBox.Show($"Ayarlar kaydedilirken hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void TxtDelay_TextChanged(object sender, EventArgs e)
+        {
+            // Textbox değeri değiştiğinde startDelay'i güncelle
+            if (int.TryParse(txtDelay.Text, out int delay) && delay >= 0)
+            {
+                startDelay = delay;
+            }
+        }
+        
+        private void TxtDelay_Leave(object sender, EventArgs e)
+        {
+            // Textbox'tan çıkıldığında değeri doğrula ve kaydet
+            if (!int.TryParse(txtDelay.Text, out int delay) || delay < 0)
+            {
+                // Geçersiz değer girildiyse eski değere geri dön
+                txtDelay.Text = startDelay.ToString();
+            }
+            else
+            {
+                startDelay = delay;
+                SaveSettings(); // Değer değiştiğinde hemen kaydet
             }
         }
 
@@ -1972,4 +2003,5 @@ namespace RSBotManager
         #endregion
     }
 }
+
 
